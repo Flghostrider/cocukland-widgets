@@ -347,7 +347,7 @@ function ty_miniKart(y){
 }
 function ty_vitrinOlustur(yorumlar){
   var wrap = document.createElement("div");wrap.id = TY_VITRIN_ID;
-  wrap.style.cssText = "margin:20px 0 28px;font-family:inherit;";
+  wrap.style.cssText = "grid-column:1 / -1;width:100%;box-sizing:border-box;margin:20px 0 28px;font-family:inherit;";
   var ustSatir = document.createElement("div");ustSatir.style.cssText = "display:flex;align-items:center;gap:10px;margin-bottom:2px;padding:0 4px;flex-wrap:wrap;";
   var rozet = document.createElement("span");rozet.textContent = "Trendyol";
   rozet.style.cssText = "background:" + TY_TURUNCU + ";color:#fff;font-size:11px;font-weight:700;padding:3px 9px;border-radius:5px;letter-spacing:0.3px;";
