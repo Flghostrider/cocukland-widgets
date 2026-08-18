@@ -329,8 +329,13 @@ function ty_ortalamaHesapla(yorumlar){
   var toplam = 0;(yorumlar || []).forEach(function(y){ toplam += (y.puan || 0); });
   return (yorumlar && yorumlar.length) ? (toplam / yorumlar.length) : 0;
 }
-function ty_ozetKartiOlustur(yorumlar){
-  var ortalama = ty_ortalamaHesapla(yorumlar);
+function ty_liste(icerik){
+  return Array.isArray(icerik) ? icerik : ((icerik && icerik.yorumlar) || []);
+}
+function ty_ozetKartiOlustur(icerik){
+  var liste = ty_liste(icerik);
+  var ortalama = (icerik && !Array.isArray(icerik) && icerik.ortalamaPuan != null) ? icerik.ortalamaPuan : ty_ortalamaHesapla(liste);
+  var sayiToplam = (icerik && !Array.isArray(icerik) && icerik.toplamDegerlendirme != null) ? icerik.toplamDegerlendirme : liste.length;
   var wrap = document.createElement("div");wrap.id = TY_OZET_ID;
   wrap.style.cssText = "display:flex;align-items:center;gap:8px;margin:10px 0 4px;padding:10px 12px;background:#fff8f0;border-radius:10px;cursor:pointer;flex-wrap:wrap;";
   var rozet = document.createElement("span");rozet.textContent = "Trendyol";
@@ -340,7 +345,7 @@ function ty_ozetKartiOlustur(yorumlar){
   sayi.style.cssText = "font-size:15px;font-weight:700;color:#1a1a1a;";
   wrap.appendChild(sayi);
   wrap.appendChild(ty_yildizYap(ortalama, 14));
-  var sayac = document.createElement("span");sayac.textContent = "(" + (yorumlar ? yorumlar.length : 0) + " degerlendirme)";
+  var sayac = document.createElement("span");sayac.textContent = "(" + sayiToplam + " degerlendirme)";
   sayac.style.cssText = "font-size:12px;color:#999;text-decoration:underline;";
   wrap.appendChild(sayac);
   wrap.addEventListener("click", function(){var hedefEl = document.getElementById(TY_VITRIN_ID);if(hedefEl) hedefEl.scrollIntoView({behavior:"smooth", block:"start"});});
@@ -359,7 +364,10 @@ function ty_miniKart(y){
   govde.textContent = y.metin || "";kart.appendChild(govde);
   return kart;
 }
-function ty_vitrinOlustur(yorumlar){
+function ty_vitrinOlustur(icerik){
+  var yorumlar = ty_liste(icerik);
+  var ortalama = (icerik && !Array.isArray(icerik) && icerik.ortalamaPuan != null) ? icerik.ortalamaPuan : ty_ortalamaHesapla(yorumlar);
+  var toplamYorum = (icerik && !Array.isArray(icerik) && icerik.toplamYorum != null) ? icerik.toplamYorum : yorumlar.length;
   var wrap = document.createElement("div");wrap.id = TY_VITRIN_ID;
   wrap.style.cssText = "grid-column:1 / -1;width:100%;box-sizing:border-box;margin:20px 0 28px;font-family:inherit;";
   var ustSatir = document.createElement("div");ustSatir.style.cssText = "display:flex;align-items:center;gap:10px;margin-bottom:2px;padding:0 4px;flex-wrap:wrap;";
@@ -367,10 +375,9 @@ function ty_vitrinOlustur(yorumlar){
   rozet.style.cssText = "background:" + TY_TURUNCU + ";color:#fff;font-size:11px;font-weight:700;padding:3px 9px;border-radius:5px;letter-spacing:0.3px;";
   var baslik = document.createElement("span");baslik.textContent = "Musteri Yorumlari";
   baslik.style.cssText = "font-weight:700;font-size:15px;color:#1a1a1a;";
-  var ortalama = ty_ortalamaHesapla(yorumlar);
   var ozetSayi = document.createElement("span");ozetSayi.textContent = ortalama.toFixed(1);
   ozetSayi.style.cssText = "font-size:14px;font-weight:700;color:#1a1a1a;margin-left:4px;";
-  var sayac = document.createElement("span");sayac.textContent = "(" + yorumlar.length + ")";
+  var sayac = document.createElement("span");sayac.textContent = "(" + toplamYorum + ")";
   sayac.style.cssText = "font-size:12px;color:#999;";
   ustSatir.appendChild(rozet);ustSatir.appendChild(baslik);ustSatir.appendChild(ozetSayi);ustSatir.appendChild(ty_yildizYap(ortalama, 13));ustSatir.appendChild(sayac);
   wrap.appendChild(ustSatir);
@@ -405,22 +412,22 @@ function ccTrendyolVitrin(){
   var barkodlar = ty_tumBarkodlar();
   var cid = null;
   for(var i=0;i<barkodlar.length;i++){ if(ty_veri.barkodCid[barkodlar[i]]){ cid = ty_veri.barkodCid[barkodlar[i]]; break; } }
-  if(!cid || !ty_veri.icerikler[cid] || !ty_veri.icerikler[cid].length){
+  if(!cid || !ty_veri.icerikler[cid] || !ty_liste(ty_veri.icerikler[cid]).length){
     if(mevcut) mevcut.remove(); if(mevcutOzet) mevcutOzet.remove(); return;
   }
-  var vitrinTamam = mevcut && mevcut.getAttribute("data-cid") === cid && mevcut.getAttribute("data-v") === "7";
-  var ozetTamam = mevcutOzet && mevcutOzet.getAttribute("data-cid") === cid && mevcutOzet.getAttribute("data-v") === "7";
+  var vitrinTamam = mevcut && mevcut.getAttribute("data-cid") === cid && mevcut.getAttribute("data-v") === "8";
+  var ozetTamam = mevcutOzet && mevcutOzet.getAttribute("data-cid") === cid && mevcutOzet.getAttribute("data-v") === "8";
   if(vitrinTamam && ozetTamam) return;
   if(!vitrinTamam && mevcut){ mevcut.remove(); mevcut = null; }
   if(!ozetTamam && mevcutOzet){ mevcutOzet.remove(); mevcutOzet = null; }
   if(!vitrinTamam){
     var yeni = ty_vitrinOlustur(ty_veri.icerikler[cid]);
-    yeni.setAttribute("data-cid", cid);yeni.setAttribute("data-v", "7");
+    yeni.setAttribute("data-cid", cid);yeni.setAttribute("data-v", "8");
     slider.insertAdjacentElement("afterend", yeni);
   }
   if(buyBox && !ozetTamam){
     var ozet = ty_ozetKartiOlustur(ty_veri.icerikler[cid]);
-    ozet.setAttribute("data-cid", cid);ozet.setAttribute("data-v", "7");
+    ozet.setAttribute("data-cid", cid);ozet.setAttribute("data-v", "8");
     buyBox.insertAdjacentElement("beforebegin", ozet);
   }
 }

@@ -181,6 +181,12 @@ def _urun_yorumlarini_cek(trendyol_url: str) -> dict | None:
     return None
 
 
+def ty_ortalamaHesapla_py(yorumlar: list[dict]) -> float:
+    if not yorumlar:
+        return 0.0
+    return sum(y.get("puan", 0) for y in yorumlar) / len(yorumlar)
+
+
 def _yorumlari_bicimlendir(veri: dict | None) -> list[dict]:
     if not veri or not veri.get("reviews"):
         return []
@@ -221,13 +227,34 @@ def main() -> None:
     print(f"   {len(gruplar)} benzersiz Trendyol urunu")
 
     print("4/4 Her urun taraniyor (duz HTTP, headless tarayici yok)...")
-    icerikler: dict[str, list[dict]] = {}
+    icerikler: dict[str, dict] = {}
     barkod_cid: dict[str, str] = {}
     for i, (cid, g) in enumerate(gruplar.items(), 1):
         veri = _urun_yorumlarini_cek(g["url"])
         yorumlar = _yorumlari_bicimlendir(veri)
         if yorumlar:
-            icerikler[cid] = yorumlar
+            # aggregateRating Trendyol'un GERCEK toplamini tasir - JSON-LD'ye
+            # gomulu yorum listesi sadece bir ornek (cogu urunde 20-30 ile
+            # sinirli), bu yuzden sayaci array uzunlugundan degil buradan al.
+            agg = (veri or {}).get("aggregateRating") or {}
+            try:
+                ortalama_puan = float(agg.get("ratingValue"))
+            except (TypeError, ValueError):
+                ortalama_puan = ty_ortalamaHesapla_py(yorumlar)
+            try:
+                toplam_degerlendirme = int(agg.get("ratingCount"))
+            except (TypeError, ValueError):
+                toplam_degerlendirme = len(yorumlar)
+            try:
+                toplam_yorum = int(agg.get("reviewCount"))
+            except (TypeError, ValueError):
+                toplam_yorum = len(yorumlar)
+            icerikler[cid] = {
+                "yorumlar": yorumlar,
+                "ortalamaPuan": ortalama_puan,
+                "toplamDegerlendirme": max(toplam_degerlendirme, toplam_yorum, len(yorumlar)),
+                "toplamYorum": max(toplam_yorum, len(yorumlar)),
+            }
         for barkod in g["barkodlar"]:
             barkod_cid[barkod] = cid
         if i % 20 == 0 or i == len(gruplar):
