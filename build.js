@@ -1,18 +1,20 @@
 // Cocukland site widget'lari - tek konsolide bundle
 // Kaynak: eskiden Ikas Scriptler'da 5 ayri script + 5 ayri MutationObserver/setInterval olarak calisiyordu.
 // Bu dosya hepsini TEK gozlemci + TEK interval altinda birlestirir.
+//
+// Trendyol yorum verisi ARTIK GOMULU DEGIL - data/yorumlar.json'dan fetch
+// ile cekiliyor (2026-08-18). Once statik olarak baka bir oturumun gecici
+// klasorundeki dosyadan uretiliyordu, o klasor silinince guncellenemez
+// hale gelmisti. .github/workflows/yorumlar.yml her 3 gunde bir
+// data/yorumlar.json'i tazeler, bu bundle her sayfa yuklemesinde en
+// guncel halini fetch eder - GitHub'da calisir, yerel makine kapali
+// olsa bile durmaz.
 const fs = require('fs');
 const path = require('path');
 
-const veriPath = path.join(__dirname, '..', '..', '..', '..', 'AppData', 'Local', 'Temp', 'claude',
-  'C--Users-numum-OneDrive-Masa-st--Claude-Code', '8804fe94-9ccf-46b7-915d-1fcaf0bebb7f', 'scratchpad', 'script_5_veri.json');
-const VERI_JSON = fs.readFileSync(veriPath, 'utf-8');
-
-const bundle = `/* Cocukland Site Widgetleri - konsolide bundle. Deploy: cocukland-widgets/ -> Cloudflare Pages */
+const bundle = `/* Cocukland Site Widgetleri - konsolide bundle. Deploy: cocukland-widgets/ -> jsDelivr CDN */
 (function(){
 'use strict';
-
-var TRENDYOL_VERI = ${VERI_JSON};
 
 /* ---------- 1) Kargo cubugu + marka seridi + magaza bilgisi + checkout guven + kategori sayisi + teslimat suresi ---------- */
 function ccShippingBar(){
@@ -283,10 +285,24 @@ function ccZenginIcerik(){
   if(!zi_applyFromLocalNextData()) zi_refetchAndApply();
 }
 
-/* ---------- 4) Trendyol yorum vitrini - urune ozel barkod ile eslesen yorumlari gosterir ---------- */
-var TY_ESKI_ID = "trendyol-yorum-vitrin";
+/* ---------- 4) Trendyol yorum vitrini - urun gorsellerinin ALTINDA, surekli donen kart seridi ---------- */
+/* Veri artik bundle'a gomulu degil - her sayfa yuklemesinde jsDelivr'dan
+   fetch edilir. .github/workflows/yorumlar.yml bu dosyayi 3 gunde bir
+   tazeler (GitHub'in kendi sunucusunda calisir - yerel makine kapali
+   olsa da durmaz). jsDelivr CDN ~birkac dakikada bir onbellek yeniler. */
+var TY_VITRIN_ID = "trendyol-yorum-vitrin";
 var TY_OZET_ID = "trendyol-yorum-ozet";
 var TY_TURUNCU = "#f27a1a";
+var TY_VERI_URL = "https://cdn.jsdelivr.net/gh/Flghostrider/cocukland-widgets@master/data/yorumlar.json";
+var ty_veri = null;      // null = henuz cekilmedi, false = cekme basarisiz, object = hazir
+var ty_veriIsteAtildi = false;
+function ty_veriGetir(){
+  if(ty_veriIsteAtildi) return;
+  ty_veriIsteAtildi = true;
+  fetch(TY_VERI_URL).then(function(r){ return r.json(); }).then(function(d){
+    ty_veri = d;
+  }).catch(function(){ ty_veri = false; });
+}
 function ty_tumBarkodlar(){
   try {
     var el = document.getElementById("__NEXT_DATA__");
@@ -301,7 +317,7 @@ function ty_tumBarkodlar(){
 }
 function ty_yildizYap(puan, boyut){
   var dolu = Math.round(puan);
-  var wrap = document.createElement("span");wrap.style.cssText = "letter-spacing:1px;";
+  var wrap = document.createElement("span");wrap.style.cssText = "letter-spacing:1px;white-space:nowrap;";
   for(var i=0;i<5;i++){
     var s = document.createElement("span");s.textContent = String.fromCharCode(9733);
     s.style.cssText = "font-size:" + (boyut||18) + "px;color:" + (i<dolu ? TY_TURUNCU : "#e0e0e0") + ";";
@@ -327,67 +343,92 @@ function ty_ozetKartiOlustur(yorumlar){
   var sayac = document.createElement("span");sayac.textContent = "(" + (yorumlar ? yorumlar.length : 0) + " degerlendirme)";
   sayac.style.cssText = "font-size:12px;color:#999;text-decoration:underline;";
   wrap.appendChild(sayac);
-  wrap.addEventListener("click", function(){var hedefEl = document.getElementById(TY_ESKI_ID);if(hedefEl) hedefEl.scrollIntoView({behavior:"smooth", block:"start"});});
+  wrap.addEventListener("click", function(){var hedefEl = document.getElementById(TY_VITRIN_ID);if(hedefEl) hedefEl.scrollIntoView({behavior:"smooth", block:"start"});});
   return wrap;
 }
-function ty_kartOlustur(yorumlar){
-  var wrap = document.createElement("div");wrap.id = TY_ESKI_ID;
-  wrap.style.cssText = "margin:24px 0;padding:20px;border:1px solid #eee;border-radius:14px;background:#fff;box-shadow:0 2px 10px rgba(0,0,0,0.04);font-family:inherit;";
-  var ustSatir = document.createElement("div");ustSatir.style.cssText = "display:flex;align-items:center;gap:8px;margin-bottom:4px;";
+function ty_miniKart(y){
+  var kart = document.createElement("div");
+  kart.style.cssText = "flex:0 0 auto;width:280px;margin:0 8px;padding:14px 16px;background:#fff;border:1px solid #eee;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.04);";
+  var ust = document.createElement("div");ust.style.cssText = "display:flex;align-items:center;gap:8px;margin-bottom:6px;";
+  ust.appendChild(ty_yildizYap(y.puan, 14));
+  var isim = document.createElement("span");isim.textContent = y.yazan || "Musteri";
+  isim.style.cssText = "font-size:12px;color:#888;font-weight:600;";
+  ust.appendChild(isim);kart.appendChild(ust);
+  var govde = document.createElement("div");
+  govde.style.cssText = "font-size:13px;color:#333;line-height:1.5;overflow:hidden;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;";
+  govde.textContent = y.metin || "";kart.appendChild(govde);
+  return kart;
+}
+function ty_vitrinOlustur(yorumlar){
+  var wrap = document.createElement("div");wrap.id = TY_VITRIN_ID;
+  wrap.style.cssText = "margin:20px 0 28px;font-family:inherit;";
+  var ustSatir = document.createElement("div");ustSatir.style.cssText = "display:flex;align-items:center;gap:10px;margin-bottom:2px;padding:0 4px;flex-wrap:wrap;";
   var rozet = document.createElement("span");rozet.textContent = "Trendyol";
   rozet.style.cssText = "background:" + TY_TURUNCU + ";color:#fff;font-size:11px;font-weight:700;padding:3px 9px;border-radius:5px;letter-spacing:0.3px;";
   var baslik = document.createElement("span");baslik.textContent = "Musteri Yorumlari";
   baslik.style.cssText = "font-weight:700;font-size:15px;color:#1a1a1a;";
-  ustSatir.appendChild(rozet);ustSatir.appendChild(baslik);wrap.appendChild(ustSatir);
   var ortalama = ty_ortalamaHesapla(yorumlar);
-  var ozetSatir = document.createElement("div");ozetSatir.style.cssText = "display:flex;align-items:center;gap:8px;margin-bottom:10px;";
   var ozetSayi = document.createElement("span");ozetSayi.textContent = ortalama.toFixed(1);
-  ozetSayi.style.cssText = "font-size:20px;font-weight:700;color:#1a1a1a;";
-  ozetSatir.appendChild(ozetSayi);ozetSatir.appendChild(ty_yildizYap(ortalama, 18));
-  var ozetSayac = document.createElement("span");ozetSayac.textContent = "(" + (yorumlar ? yorumlar.length : 0) + " degerlendirme)";
-  ozetSayac.style.cssText = "font-size:13px;color:#999;";
-  ozetSatir.appendChild(ozetSayac);wrap.appendChild(ozetSatir);
-  var not_ = document.createElement("div");not_.style.cssText = "font-size:12px;color:#999;margin-bottom:16px;";
+  ozetSayi.style.cssText = "font-size:14px;font-weight:700;color:#1a1a1a;margin-left:4px;";
+  var sayac = document.createElement("span");sayac.textContent = "(" + yorumlar.length + ")";
+  sayac.style.cssText = "font-size:12px;color:#999;";
+  ustSatir.appendChild(rozet);ustSatir.appendChild(baslik);ustSatir.appendChild(ozetSayi);ustSatir.appendChild(ty_yildizYap(ortalama, 13));ustSatir.appendChild(sayac);
+  wrap.appendChild(ustSatir);
+  var not_ = document.createElement("div");not_.style.cssText = "font-size:11px;color:#999;margin:2px 0 12px;padding:0 4px;";
   not_.textContent = "Bu urun baska bir satis kanalinda da satiliyor. Asagidaki yorumlar o kanaldan derlenmistir ve magaza puanimiza dahil degildir.";
   wrap.appendChild(not_);
-  (yorumlar || []).forEach(function(y, idx){
-    var kart = document.createElement("div");kart.style.cssText = "padding:14px 0;" + (idx>0 ? "border-top:1px solid #f0f0f0;" : "");
-    var ustBlok = document.createElement("div");ustBlok.style.cssText = "display:flex;align-items:center;gap:10px;margin-bottom:6px;flex-wrap:wrap;";
-    ustBlok.appendChild(ty_yildizYap(y.puan, 16));
-    var isim = document.createElement("span");isim.textContent = y.yazan || "Musteri";
-    isim.style.cssText = "font-size:13px;color:#666;font-weight:600;";
-    ustBlok.appendChild(isim);kart.appendChild(ustBlok);
-    var govde = document.createElement("div");govde.style.cssText = "font-size:14px;color:#333;line-height:1.5;";
-    govde.textContent = y.metin || "";kart.appendChild(govde);
-    wrap.appendChild(kart);
-  });
+  var kayan = document.createElement("div");
+  kayan.style.cssText = "overflow:hidden;width:100%;";
+  var track = document.createElement("div");
+  track.className = "ty-vitrin-track";
+  var hizSn = Math.max(18, yorumlar.length * 5);
+  track.style.cssText = "display:flex;width:max-content;padding:4px 0;animation:ty-vitrin-scroll " + hizSn + "s linear infinite;";
+  yorumlar.forEach(function(y){ track.appendChild(ty_miniKart(y)); });
+  yorumlar.forEach(function(y){ track.appendChild(ty_miniKart(y)); }); // ikinci kopya - kesintisiz donus
+  kayan.appendChild(track);
+  wrap.appendChild(kayan);
+  if(!document.getElementById("ty-vitrin-style")){
+    var style = document.createElement("style");style.id = "ty-vitrin-style";
+    style.textContent = "@keyframes ty-vitrin-scroll{0%{transform:translateX(0);}100%{transform:translateX(-50%);}}#" + TY_VITRIN_ID + ":hover .ty-vitrin-track{animation-play-state:paused;}";
+    document.head.appendChild(style);
+  }
   return wrap;
 }
 function ccTrendyolVitrin(){
-  var isProductPage = !!document.querySelector(".product-detail-tabs-main");
-  if(!isProductPage) return;
-  var veri = TRENDYOL_VERI;
+  var slider = document.querySelector(".product-detail-page-slider-main");
+  var buyBox = document.querySelector(".product-detail-page-detail-price-box");
+  var mevcut = document.getElementById(TY_VITRIN_ID);
+  var mevcutOzet = document.getElementById(TY_OZET_ID);
+  if(!slider){ if(mevcut) mevcut.remove(); if(mevcutOzet) mevcutOzet.remove(); return; }
+  if(ty_veri === null){ ty_veriGetir(); return; } // henuz gelmedi, sonraki dongude tekrar denenir
+  if(!ty_veri){ if(mevcut) mevcut.remove(); if(mevcutOzet) mevcutOzet.remove(); return; }
   var barkodlar = ty_tumBarkodlar();
   var cid = null;
-  for(var i=0;i<barkodlar.length;i++){if(veri.barkodCid[barkodlar[i]]){ cid = veri.barkodCid[barkodlar[i]]; break; }}
-  var hedef = document.querySelector(".product-detail-tabs-main .tab-content");
-  var buyBox = document.querySelector(".product-detail-page-detail-price-box");
-  var mevcut = document.getElementById(TY_ESKI_ID);
-  var mevcutOzet = document.getElementById(TY_OZET_ID);
-  if(!cid || !veri.icerikler[cid]){if(mevcut) mevcut.remove();if(mevcutOzet) mevcutOzet.remove();return;}
-  var vitrinTamam = mevcut && mevcut.getAttribute("data-cid") === cid && mevcut.getAttribute("data-v") === "6" && mevcut.children.length > 0;
-  var ozetTamam = mevcutOzet && mevcutOzet.getAttribute("data-cid") === cid && mevcutOzet.getAttribute("data-v") === "6" && mevcutOzet.children.length > 0;
+  for(var i=0;i<barkodlar.length;i++){ if(ty_veri.barkodCid[barkodlar[i]]){ cid = ty_veri.barkodCid[barkodlar[i]]; break; } }
+  if(!cid || !ty_veri.icerikler[cid] || !ty_veri.icerikler[cid].length){
+    if(mevcut) mevcut.remove(); if(mevcutOzet) mevcutOzet.remove(); return;
+  }
+  var vitrinTamam = mevcut && mevcut.getAttribute("data-cid") === cid && mevcut.getAttribute("data-v") === "7";
+  var ozetTamam = mevcutOzet && mevcutOzet.getAttribute("data-cid") === cid && mevcutOzet.getAttribute("data-v") === "7";
   if(vitrinTamam && ozetTamam) return;
   if(!vitrinTamam && mevcut){ mevcut.remove(); mevcut = null; }
   if(!ozetTamam && mevcutOzet){ mevcutOzet.remove(); mevcutOzet = null; }
-  if(hedef && !vitrinTamam){var yeni = ty_kartOlustur(veri.icerikler[cid]);yeni.setAttribute("data-cid", cid);yeni.setAttribute("data-v", "6");hedef.appendChild(yeni);}
-  if(buyBox && !ozetTamam){var ozet = ty_ozetKartiOlustur(veri.icerikler[cid]);ozet.setAttribute("data-cid", cid);ozet.setAttribute("data-v", "6");buyBox.insertAdjacentElement("beforebegin", ozet);}
+  if(!vitrinTamam){
+    var yeni = ty_vitrinOlustur(ty_veri.icerikler[cid]);
+    yeni.setAttribute("data-cid", cid);yeni.setAttribute("data-v", "7");
+    slider.insertAdjacentElement("afterend", yeni);
+  }
+  if(buyBox && !ozetTamam){
+    var ozet = ty_ozetKartiOlustur(ty_veri.icerikler[cid]);
+    ozet.setAttribute("data-cid", cid);ozet.setAttribute("data-v", "7");
+    buyBox.insertAdjacentElement("beforebegin", ozet);
+  }
 }
 
 /* ---------- Paylasilan tek gozlemci + tek dongu ---------- */
 function isInsideOurs(node){
   var el=node&&node.nodeType===1?node:(node&&node.parentElement);
-  return !!(el&&el.closest&&(el.closest('#cc-shipping-bar')||el.closest('#cc-brand-strip')||el.closest('#cc-footer-stores')||el.closest('#cc-store-list')||el.closest('#cc-checkout-trust')||el.closest('#cc-category-count')||el.closest('#cc-product-delivery')||el.closest('#'+TY_ESKI_ID)||el.closest('#'+TY_OZET_ID)||el.closest('#zengin-icerik-blok')));
+  return !!(el&&el.closest&&(el.closest('#cc-shipping-bar')||el.closest('#cc-brand-strip')||el.closest('#cc-footer-stores')||el.closest('#cc-store-list')||el.closest('#cc-checkout-trust')||el.closest('#cc-category-count')||el.closest('#cc-product-delivery')||el.closest('#'+TY_VITRIN_ID)||el.closest('#'+TY_OZET_ID)||el.closest('#zengin-icerik-blok')));
 }
 function renderAll(){
   ccShippingBar();ccBrandStrip();ccStoreInfo();ccCheckoutTrust();ccCategoryCount();ccProductDelivery();

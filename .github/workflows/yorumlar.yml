@@ -1,0 +1,51 @@
+name: Trendyol yorumlarini tazele
+
+on:
+  schedule:
+    # Her 3 gunde bir, gece 03:00 UTC (06:00 TR) - GitHub'in kendi
+    # sunucusunda calisir, yerel makine acik olmak ZORUNDA DEGIL.
+    - cron: "0 3 */3 * *"
+  workflow_dispatch: {}
+
+jobs:
+  topla:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Bagimliliklari kur
+        run: pip install requests
+
+      - name: Yorumlari topla
+        env:
+          IKAS_MAGAZA: ${{ secrets.IKAS_MAGAZA }}
+          IKAS_CLIENT_ID: ${{ secrets.IKAS_CLIENT_ID }}
+          IKAS_CLIENT_SECRET: ${{ secrets.IKAS_CLIENT_SECRET }}
+          TRENDYOL_SATICI_ID: ${{ secrets.TRENDYOL_SATICI_ID }}
+          TRENDYOL_API_KEY: ${{ secrets.TRENDYOL_API_KEY }}
+          TRENDYOL_API_SECRET: ${{ secrets.TRENDYOL_API_SECRET }}
+        run: python .github/scripts/yorumlar_topla.py
+
+      - name: Guncelleme zaman damgasini ekle
+        run: |
+          python - <<'PY'
+          import json, datetime
+          p = "data/yorumlar.json"
+          d = json.load(open(p, encoding="utf-8"))
+          d["guncelleme"] = datetime.datetime.utcnow().isoformat() + "Z"
+          json.dump(d, open(p, "w", encoding="utf-8"), ensure_ascii=False)
+          PY
+
+      - name: Degisiklik varsa commit'le
+        run: |
+          git config user.name "cocukland-bot"
+          git config user.email "actions@github.com"
+          git add data/yorumlar.json
+          git diff --cached --quiet && echo "degisiklik yok" || git commit -m "Trendyol yorumlarini tazele [otomatik]"
+          git push
