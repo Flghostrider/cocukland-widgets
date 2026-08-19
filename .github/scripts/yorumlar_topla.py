@@ -160,13 +160,27 @@ def _trendyol_urun_url_coz(barkodlar: list[str]) -> dict[str, str]:
 
 
 def _urun_yorumlarini_cek(trendyol_url: str) -> dict | None:
-    try:
-        r = requests.get(trendyol_url, headers={"User-Agent": UA}, timeout=20)
-        r.raise_for_status()
-        html = r.text
-    except requests.RequestException as e:
-        print(f"  [hata] {trendyol_url}: {e}")
-        return None
+    # Trendyol paylasimli/datacenter IP'lerden (GitHub Actions runner'lari gibi)
+    # gelen yogun istekleri 429 ile sinirlandirabiliyor - birkac kez artan
+    # bekleme ile tekrar dene, hepsi basarisiz olursa None don (cagiran taraf
+    # bunu "bu urun icin yorum yok" olarak degil, main()'deki es esik guvenlik
+    # kontroluyle ele alir).
+    gecikmeler = [0, 2, 5]
+    for deneme, gecikme in enumerate(gecikmeler):
+        if gecikme:
+            time.sleep(gecikme)
+        try:
+            r = requests.get(trendyol_url, headers={"User-Agent": UA}, timeout=20)
+            if r.status_code == 429 and deneme < len(gecikmeler) - 1:
+                continue
+            r.raise_for_status()
+            html = r.text
+            break
+        except requests.RequestException as e:
+            if deneme == len(gecikmeler) - 1:
+                print(f"  [hata] {trendyol_url}: {e}")
+                return None
+            continue
     bloklar = re.findall(r'<script type="application/ld\+json">(.*?)</script>', html, re.S)
     for blok in bloklar:
         try:
@@ -260,6 +274,28 @@ def main() -> None:
         if i % 20 == 0 or i == len(gruplar):
             print(f"   [{i}/{len(gruplar)}] taranan urun, su ana kadar {len(icerikler)} urun yorumlu")
         time.sleep(0.15)
+
+    # GUVENLIK ESIGI: Trendyol paylasimli/datacenter IP'leri (GitHub Actions
+    # runner'lari gibi) 429 ile agir sekilde sinirlandirabiliyor - boyle bir
+    # durumda TUM taramalar basarisiz olur ve icerikler bombos kalir. Bu
+    # durumda eski (iyi) veriyi BOMBOS sonucla EZMEK yerine, dosyaya
+    # dokunmadan cik - canli sitede yorumlar tamamen kaybolmasin.
+    eski_urun_sayisi = 0
+    if VERI_YOLU.exists():
+        try:
+            eski_veri = json.loads(VERI_YOLU.read_text(encoding="utf-8"))
+            eski_urun_sayisi = len(eski_veri.get("icerikler") or {})
+        except Exception:  # noqa: BLE001
+            eski_urun_sayisi = 0
+    esik = max(5, int(eski_urun_sayisi * 0.5))
+    if eski_urun_sayisi and len(icerikler) < esik:
+        print(
+            f"\n[GUVENLIK ESIGI] Yeni tarama sadece {len(icerikler)} urun yorumlu "
+            f"getirdi (eski dosyada {eski_urun_sayisi} vardi, esik {esik}). "
+            "Muhtemelen Trendyol bu IP'yi sinirlandirdi (429). Eski veri "
+            "KORUNDU, dosyaya yazilmadi."
+        )
+        sys.exit(1)
 
     cikti = {"barkodCid": barkod_cid, "icerikler": icerikler, "guncelleme": None}
     VERI_YOLU.parent.mkdir(parents=True, exist_ok=True)
