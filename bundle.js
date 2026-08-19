@@ -274,6 +274,7 @@ function zi_stilEkle(){
 }
 function zi_buildCards(wrap, src, naturalW, naturalH, segments){
   wrap.innerHTML = '';
+  wrap.style.minHeight = '0px';   /* yer tutucu yuksekligini birak */
   zi_stilEkle();
   var izgara = document.createElement('div'); izgara.className = 'zi-izgara';
   segments.forEach(function(seg, idx){
@@ -297,6 +298,7 @@ function zi_buildCards(wrap, src, naturalW, naturalH, segments){
 }
 function zi_buildFallbackImg(wrap, src){
   wrap.innerHTML = '';
+  wrap.style.minHeight = '0px';
   var img = document.createElement('img');
   img.src = src; img.alt = 'Ürün Detayları'; img.loading = 'lazy';
   img.style.cssText = 'display:block;width:100%;height:auto;border-radius:12px;';
@@ -338,7 +340,10 @@ function zi_applyImage(imgId){
   wrap.setAttribute('data-v', ZI_SURUM);
   /* 1000px: hero neredeyse 1:1 (kaynak 1080px), kartlar ~490px. Daha genis kap
      sayfayi gereksiz uzatiyor, daha dar kap yaziyi kucultuyor. */
-  wrap.style.cssText = 'grid-column:1 / -1;width:100%;max-width:1000px;margin:24px auto 8px;box-sizing:border-box;';
+  /* min-height ZORUNLU: yuksekligi 0 olan yer tutucu IntersectionObserver'a
+     hicbir zaman "gorunur" gelmiyor (canli dogrulandi 2026-08-19) ve tembel
+     yukleme hic tetiklenmiyordu. Ayrica yuklenirken sayfa zipplamasini onler. */
+  wrap.style.cssText = 'grid-column:1 / -1;width:100%;max-width:1000px;margin:24px auto 8px;box-sizing:border-box;min-height:320px;';
   slider.insertAdjacentElement('afterend', wrap);
   zi_gorununceYukle(wrap, src);
 }
