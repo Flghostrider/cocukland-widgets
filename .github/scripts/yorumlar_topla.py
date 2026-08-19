@@ -297,6 +297,12 @@ def main() -> None:
         )
         sys.exit(1)
 
+    # Yorumu OLMAYAN urunlerin barkodlarini haritadan cikar - widget zaten
+    # onlar icin hicbir sey gostermiyor, ama bu barkodlar dosyanin ~%35'ini
+    # kapliyordu ve her urun sayfasinda bosuna indiriliyordu.
+    barkod_cid = {b: c for b, c in barkod_cid.items() if c in icerikler}
+    print(f"   barkod haritasi budandi -> {len(barkod_cid)} (yalnizca yorumu olan urunler)")
+
     cikti = {"barkodCid": barkod_cid, "icerikler": icerikler, "guncelleme": None}
     VERI_YOLU.parent.mkdir(parents=True, exist_ok=True)
     VERI_YOLU.write_text(json.dumps(cikti, ensure_ascii=False), encoding="utf-8")

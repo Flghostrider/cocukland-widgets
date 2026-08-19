@@ -141,6 +141,49 @@ function ccBedenTablosu(){
   if(ours&&img.src!==target){img.src=target;img.srcset='';}
 }
 
+/* ---------- ORTAK: gecerli sayfanin __NEXT_DATA__'si ----------
+   KRITIK: Next.js, SPA (yumusak) gecislerde sayfadaki __NEXT_DATA__ script
+   etiketini GUNCELLEMIYOR - ilk sunucu render'indan kalan veri orada oyle
+   duruyor. Bu yuzden kullanici siteyi gezerken widget'lar bir onceki urunun
+   barkodlarini/gorsellerini okuyup YANLIS urune yorum basiyordu.
+
+   Cozum: pageTitle == document.title tazelik kapisi. Bayatsa mevcut yolun
+   HTML'i bir kez cekilip __NEXT_DATA__'si ayristirilir ve yol bazinda
+   onbelleklenir. Hem Zengin Icerik hem Trendyol yorumlari ayni onbellegi
+   kullanir - onceden Zengin Icerik kendi basina fetch ediyordu, simdi tek
+   istek ikisine birden yetiyor (site daha az yoruluyor). */
+var cc_sayfaOnbellek = {};   /* yol -> {durum:'bekliyor'|'hazir'|'hata', veri} */
+function cc_yerelNextData(){
+  try {
+    var el = document.getElementById('__NEXT_DATA__');
+    if(!el) return null;
+    var d = JSON.parse(el.textContent);
+    var pp = d.props && d.props.pageProps;
+    if(!pp) return null;
+    if(pp.pageTitle !== document.title) return null;   /* bayat - guvenme */
+    return d;
+  } catch(e){ return null; }
+}
+function cc_sayfaVerisi(){
+  var yerel = cc_yerelNextData();
+  if(yerel) return yerel;                 /* ilk yukleme: bedava, istek yok */
+  var yol = location.pathname;
+  var kayit = cc_sayfaOnbellek[yol];
+  if(kayit) return kayit.durum === 'hazir' ? kayit.veri : null;
+  cc_sayfaOnbellek[yol] = {durum:'bekliyor', veri:null};
+  fetch(yol, {credentials:'same-origin'}).then(function(r){ return r.text(); }).then(function(html){
+    var veri = null;
+    try {
+      var doc = new DOMParser().parseFromString(html, 'text/html');
+      var el2 = doc.getElementById('__NEXT_DATA__');
+      if(el2) veri = JSON.parse(el2.textContent);
+    } catch(e){}
+    cc_sayfaOnbellek[yol] = veri ? {durum:'hazir', veri:veri} : {durum:'hata', veri:null};
+    if(veri) schedule();                  /* veri geldi - yeniden ciz */
+  }).catch(function(){ cc_sayfaOnbellek[yol] = {durum:'hata', veri:null}; });
+  return null;
+}
+
 /* ---------- 3) Urun sayfasi zengin icerik gorseli (parcalara ayirip kart olarak gosterir) ---------- */
 var zi_lastPath=null;
 var ZI_ATTR_ID='67c8a4df-47a0-4fd4-9e96-c7f1ccc4f27d';
@@ -238,37 +281,20 @@ function zi_applyImage(imgId){
   tabContent.insertBefore(wrap, tabContent.firstChild);
   zi_renderSliced(wrap, src);
 }
-function zi_parseNextDataFromHtml(html){
-  try {var doc = new DOMParser().parseFromString(html, 'text/html');var el = doc.getElementById('__NEXT_DATA__');if(!el){ return null; }return JSON.parse(el.textContent);} catch(e){ return null; }
-}
 function zi_applyFromNextDataObject(dataObj){
   var psd = zi_findPageSpecificData(dataObj, 0);
   var imgId = psd ? zi_imageIdFromAttributes(psd.attributes) : null;
   zi_applyImage(imgId);
 }
-function zi_refetchAndApply(){
-  fetch(location.pathname, {credentials:'same-origin'}).then(function(r){return r.text();}).then(function(html){
-    var data = zi_parseNextDataFromHtml(html);if(data) zi_applyFromNextDataObject(data);
-  }).catch(function(e){});
-}
-function zi_applyFromLocalNextData(){
-  try {
-    var el = document.getElementById('__NEXT_DATA__');
-    if(!el) return false;
-    var data = JSON.parse(el.textContent);
-    var pp = data.props && data.props.pageProps;
-    if(!pp || pp.pageTitle !== document.title) return false;
-    zi_applyFromNextDataObject(data);
-    return true;
-  } catch(e){ return false; }
-}
 function ccZenginIcerik(){
   var isProductPage = !!document.querySelector('.product-detail-tabs-main');
   if(!isProductPage) return;
+  var data = cc_sayfaVerisi();      /* ortak onbellek - bayat veriye asla guvenmez */
+  if(!data) return;                 /* veri hazir degil, gelince schedule() tekrar cagirir */
   var path = location.pathname;
   if(path === zi_lastPath) return;
   zi_lastPath = path;
-  if(!zi_applyFromLocalNextData()) zi_refetchAndApply();
+  zi_applyFromNextDataObject(data);
 }
 
 /* ---------- 4) Trendyol yorum vitrini - urun gorsellerinin ALTINDA, surekli donen kart seridi ---------- */
@@ -289,11 +315,12 @@ function ty_veriGetir(){
     ty_veri = d;
   }).catch(function(){ ty_veri = false; });
 }
+/* null = sayfa verisi henuz hazir degil (widget'a DOKUNMA),
+   []   = veri hazir ama barkod yok (widget'i kaldir) */
 function ty_tumBarkodlar(){
+  var veri2 = cc_sayfaVerisi();
+  if(!veri2) return null;
   try {
-    var el = document.getElementById("__NEXT_DATA__");
-    if(!el) return [];
-    var veri2 = JSON.parse(el.textContent);
     var psd = veri2.props && veri2.props.pageProps && veri2.props.pageProps.pageSpecificData;
     if(!psd || !psd.variants) return [];
     var sonuc = [];
@@ -321,7 +348,9 @@ function ty_liste(icerik){
 function ty_ozetKartiOlustur(icerik){
   var liste = ty_liste(icerik);
   var ortalama = (icerik && !Array.isArray(icerik) && icerik.ortalamaPuan != null) ? icerik.ortalamaPuan : ty_ortalamaHesapla(liste);
-  var sayiToplam = (icerik && !Array.isArray(icerik) && icerik.toplamDegerlendirme != null) ? icerik.toplamDegerlendirme : liste.length;
+  /* Musteri "yorum" sayisini gormek istiyor (yildiz-only degerlendirmeleri
+     degil) - bu yuzden toplamYorum kullaniliyor, toplamDegerlendirme degil. */
+  var sayiToplam = (icerik && !Array.isArray(icerik) && icerik.toplamYorum != null) ? icerik.toplamYorum : liste.length;
   var wrap = document.createElement("div");wrap.id = TY_OZET_ID;
   wrap.style.cssText = "display:flex;align-items:center;gap:8px;margin:10px 0 4px;padding:10px 12px;background:#fff8f0;border-radius:10px;cursor:pointer;flex-wrap:wrap;";
   var rozet = document.createElement("span");rozet.textContent = "Trendyol";
@@ -331,7 +360,7 @@ function ty_ozetKartiOlustur(icerik){
   sayi.style.cssText = "font-size:15px;font-weight:700;color:#1a1a1a;";
   wrap.appendChild(sayi);
   wrap.appendChild(ty_yildizYap(ortalama, 14));
-  var sayac = document.createElement("span");sayac.textContent = "(" + sayiToplam + " degerlendirme)";
+  var sayac = document.createElement("span");sayac.textContent = sayiToplam + " yorum";
   sayac.style.cssText = "font-size:12px;color:#999;text-decoration:underline;";
   wrap.appendChild(sayac);
   wrap.addEventListener("click", function(){var hedefEl = document.getElementById(TY_VITRIN_ID);if(hedefEl) hedefEl.scrollIntoView({behavior:"smooth", block:"start"});});
@@ -342,7 +371,7 @@ function ty_miniKart(y){
   kart.style.cssText = "flex:0 0 auto;width:280px;margin:0 8px;padding:14px 16px;background:#fff;border:1px solid #eee;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.04);";
   var ust = document.createElement("div");ust.style.cssText = "display:flex;align-items:center;gap:8px;margin-bottom:6px;";
   ust.appendChild(ty_yildizYap(y.puan, 14));
-  var isim = document.createElement("span");isim.textContent = y.yazan || "Musteri";
+  var isim = document.createElement("span");isim.textContent = y.yazan || "Müşteri";
   isim.style.cssText = "font-size:12px;color:#888;font-weight:600;";
   ust.appendChild(isim);kart.appendChild(ust);
   var govde = document.createElement("div");
@@ -359,16 +388,16 @@ function ty_vitrinOlustur(icerik){
   var ustSatir = document.createElement("div");ustSatir.style.cssText = "display:flex;align-items:center;gap:10px;margin-bottom:2px;padding:0 4px;flex-wrap:wrap;";
   var rozet = document.createElement("span");rozet.textContent = "Trendyol";
   rozet.style.cssText = "background:" + TY_TURUNCU + ";color:#fff;font-size:11px;font-weight:700;padding:3px 9px;border-radius:5px;letter-spacing:0.3px;";
-  var baslik = document.createElement("span");baslik.textContent = "Musteri Yorumlari";
+  var baslik = document.createElement("span");baslik.textContent = "Müşteri Yorumları";
   baslik.style.cssText = "font-weight:700;font-size:15px;color:#1a1a1a;";
   var ozetSayi = document.createElement("span");ozetSayi.textContent = ortalama.toFixed(1);
   ozetSayi.style.cssText = "font-size:14px;font-weight:700;color:#1a1a1a;margin-left:4px;";
-  var sayac = document.createElement("span");sayac.textContent = "(" + toplamYorum + ")";
+  var sayac = document.createElement("span");sayac.textContent = toplamYorum + " yorum";
   sayac.style.cssText = "font-size:12px;color:#999;";
   ustSatir.appendChild(rozet);ustSatir.appendChild(baslik);ustSatir.appendChild(ozetSayi);ustSatir.appendChild(ty_yildizYap(ortalama, 13));ustSatir.appendChild(sayac);
   wrap.appendChild(ustSatir);
   var not_ = document.createElement("div");not_.style.cssText = "font-size:11px;color:#999;margin:2px 0 12px;padding:0 4px;";
-  not_.textContent = "Bu urun baska bir satis kanalinda da satiliyor. Asagidaki yorumlar o kanaldan derlenmistir ve magaza puanimiza dahil degildir.";
+  not_.textContent = "Bu ürün başka bir satış kanalında da satılıyor. Aşağıdaki yorumlar o kanaldan derlenmiştir ve mağaza puanımıza dahil değildir.";
   wrap.appendChild(not_);
   var kayan = document.createElement("div");
   kayan.style.cssText = "overflow:hidden;width:100%;";
@@ -396,24 +425,31 @@ function ccTrendyolVitrin(){
   if(ty_veri === null){ ty_veriGetir(); return; } // henuz gelmedi, sonraki dongude tekrar denenir
   if(!ty_veri){ if(mevcut) mevcut.remove(); if(mevcutOzet) mevcutOzet.remove(); return; }
   var barkodlar = ty_tumBarkodlar();
+  /* Sayfa verisi henuz hazir degil: ONCEKI urunun vitrini ekranda kalmasin
+     (yanlis urune yorum yapismasinin asil sebebi buydu) - temizle ve bekle. */
+  if(barkodlar === null){
+    if(mevcut) mevcut.remove();
+    if(mevcutOzet) mevcutOzet.remove();
+    return;
+  }
   var cid = null;
   for(var i=0;i<barkodlar.length;i++){ if(ty_veri.barkodCid[barkodlar[i]]){ cid = ty_veri.barkodCid[barkodlar[i]]; break; } }
   if(!cid || !ty_veri.icerikler[cid] || !ty_liste(ty_veri.icerikler[cid]).length){
     if(mevcut) mevcut.remove(); if(mevcutOzet) mevcutOzet.remove(); return;
   }
-  var vitrinTamam = mevcut && mevcut.getAttribute("data-cid") === cid && mevcut.getAttribute("data-v") === "8";
-  var ozetTamam = mevcutOzet && mevcutOzet.getAttribute("data-cid") === cid && mevcutOzet.getAttribute("data-v") === "8";
+  var vitrinTamam = mevcut && mevcut.getAttribute("data-cid") === cid && mevcut.getAttribute("data-v") === "9";
+  var ozetTamam = mevcutOzet && mevcutOzet.getAttribute("data-cid") === cid && mevcutOzet.getAttribute("data-v") === "9";
   if(vitrinTamam && ozetTamam) return;
   if(!vitrinTamam && mevcut){ mevcut.remove(); mevcut = null; }
   if(!ozetTamam && mevcutOzet){ mevcutOzet.remove(); mevcutOzet = null; }
   if(!vitrinTamam){
     var yeni = ty_vitrinOlustur(ty_veri.icerikler[cid]);
-    yeni.setAttribute("data-cid", cid);yeni.setAttribute("data-v", "8");
+    yeni.setAttribute("data-cid", cid);yeni.setAttribute("data-v", "9");
     slider.insertAdjacentElement("afterend", yeni);
   }
   if(buyBox && !ozetTamam){
     var ozet = ty_ozetKartiOlustur(ty_veri.icerikler[cid]);
-    ozet.setAttribute("data-cid", cid);ozet.setAttribute("data-v", "8");
+    ozet.setAttribute("data-cid", cid);ozet.setAttribute("data-v", "9");
     buyBox.insertAdjacentElement("beforebegin", ozet);
   }
 }
