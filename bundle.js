@@ -153,6 +153,16 @@ function ccBedenTablosu(){
    kullanir - onceden Zengin Icerik kendi basina fetch ediyordu, simdi tek
    istek ikisine birden yetiyor (site daha az yoruluyor). */
 var cc_sayfaOnbellek = {};   /* yol -> {durum:'bekliyor'|'hazir'|'hata', veri} */
+var cc_onbellekSira = [];    /* eklenme sirasi - uzun gezinmede bellek sismesin */
+var CC_ONBELLEK_SINIR = 8;
+function cc_onbellegeYaz(yol, kayit){
+  if(!cc_sayfaOnbellek[yol]) cc_onbellekSira.push(yol);
+  cc_sayfaOnbellek[yol] = kayit;
+  while(cc_onbellekSira.length > CC_ONBELLEK_SINIR){
+    var eski = cc_onbellekSira.shift();
+    if(eski !== location.pathname) delete cc_sayfaOnbellek[eski];
+  }
+}
 function cc_yerelNextData(){
   try {
     var el = document.getElementById('__NEXT_DATA__');
@@ -170,7 +180,7 @@ function cc_sayfaVerisi(){
   var yol = location.pathname;
   var kayit = cc_sayfaOnbellek[yol];
   if(kayit) return kayit.durum === 'hazir' ? kayit.veri : null;
-  cc_sayfaOnbellek[yol] = {durum:'bekliyor', veri:null};
+  cc_onbellegeYaz(yol, {durum:'bekliyor', veri:null});
   fetch(yol, {credentials:'same-origin'}).then(function(r){ return r.text(); }).then(function(html){
     var veri = null;
     try {
@@ -178,9 +188,9 @@ function cc_sayfaVerisi(){
       var el2 = doc.getElementById('__NEXT_DATA__');
       if(el2) veri = JSON.parse(el2.textContent);
     } catch(e){}
-    cc_sayfaOnbellek[yol] = veri ? {durum:'hazir', veri:veri} : {durum:'hata', veri:null};
+    cc_onbellegeYaz(yol, veri ? {durum:'hazir', veri:veri} : {durum:'hata', veri:null});
     if(veri) schedule();                  /* veri geldi - yeniden ciz */
-  }).catch(function(){ cc_sayfaOnbellek[yol] = {durum:'hata', veri:null}; });
+  }).catch(function(){ cc_onbellegeYaz(yol, {durum:'hata', veri:null}); });
   return null;
 }
 
