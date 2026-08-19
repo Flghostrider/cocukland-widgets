@@ -195,7 +195,7 @@ function cc_sayfaVerisi(){
 }
 
 /* ---------- 3) Urun sayfasi zengin icerik gorseli (parcalara ayirip kart olarak gosterir) ---------- */
-var zi_lastPath=null;
+var ZI_SURUM='2';
 var ZI_ATTR_ID='67c8a4df-47a0-4fd4-9e96-c7f1ccc4f27d';
 var ZI_MERCHANT='96c43624-0d17-4eb1-b5bd-60d0743043e7';
 function zi_findPageSpecificData(obj, depth){
@@ -236,8 +236,14 @@ function zi_computeSegments(img){
   while(i2<ch){
     if(bos[i2]){var j=i2;while(j<ch && bos[j]) j++;if(j-i2 >= 4) bloklar.push([i2,j,j-i2]);i2=j;} else i2++;
   }
-  bloklar.sort(function(a,b){ return b[2]-a[2]; });
-  var secili = bloklar.slice(0,9).sort(function(a,b){ return a[0]-b[0]; });
+  /* ESIK TABANLI KESIM: "en buyuk 9 bosluk" secmek yerine, belirli bir
+     yukseklikten BUYUK her bosluktan kesiyoruz. Cocukland'in A+ gorsellerinde
+     olculdu (2026-08-19): blok ARASI bosluklar 65-180px, blok ICI bosluklar
+     14-40px. 60px esigi ikisini temiz ayirir; boylece her ozellik blogu kendi
+     karti olur, iki ozellik ayni karta sikismaz. */
+  var ESIK = Math.round(60 * scale);
+  var secili = [];
+  for(var s=0;s<bloklar.length;s++){ if(bloklar[s][2] >= ESIK) secili.push(bloklar[s]); }
   var kesim = [0];
   for(var k=0;k<secili.length;k++) kesim.push(Math.round((secili[k][0]+secili[k][1])/2));
   kesim.push(ch);
@@ -245,51 +251,96 @@ function zi_computeSegments(img){
   var parcalar = [];
   for(var k2=0;k2<kesimOrijinal.length-1;k2++){
     var top = kesimOrijinal[k2], bot = kesimOrijinal[k2+1];
-    if(parcalar.length && (bot-top) < 150){parcalar[parcalar.length-1][1] = bot;} else {parcalar.push([top, bot]);}
+    /* cok ince kalan artiklari bir oncekine yapistir */
+    if(parcalar.length && (bot-top) < 180){parcalar[parcalar.length-1][1] = bot;} else {parcalar.push([top, bot]);}
   }
   if(!parcalar.length) parcalar = [[0, h]];
   return parcalar;
 }
+function zi_stilEkle(){
+  if(document.getElementById('zi-stil')) return;
+  var st = document.createElement('style'); st.id = 'zi-stil';
+  /* Tek sutun varsayilan; genis ekranda IKI sutun. Iki sutun sart: tek sutunda
+     1080px'lik A+ gorseli okunakli genislikte gostermek sayfayi ~8000px'e
+     cikariyor. Iki sutun hem okunakli hem makul boyda tutuyor. */
+  st.textContent =
+    '#zengin-icerik-blok .zi-izgara{display:grid;grid-template-columns:1fr;gap:14px;align-items:start;}' +
+    '#zengin-icerik-blok .zi-parca{width:100%;background-repeat:no-repeat;background-size:100% auto;border-radius:12px;overflow:hidden;}' +
+    '@media(min-width:900px){' +
+      '#zengin-icerik-blok .zi-izgara{grid-template-columns:1fr 1fr;gap:18px;}' +
+      '#zengin-icerik-blok .zi-parca.zi-tam{grid-column:1 / -1;}' +
+    '}';
+  document.head.appendChild(st);
+}
 function zi_buildCards(wrap, src, naturalW, naturalH, segments){
   wrap.innerHTML = '';
-  var displayW = Math.min(wrap.clientWidth || 480, 480);
-  var scaleDisp = displayW / naturalW;
-  var totalDispH = naturalH * scaleDisp;
+  zi_stilEkle();
+  var izgara = document.createElement('div'); izgara.className = 'zi-izgara';
   segments.forEach(function(seg, idx){
-    var segH = (seg[1]-seg[0]) * scaleDisp;
-    var card = document.createElement('div');
-    card.style.cssText = ['width:100%','height:'+Math.round(segH)+'px','background-image:url(' + src + ')','background-repeat:no-repeat','background-size:' + Math.round(displayW) + 'px ' + Math.round(totalDispH) + 'px','background-position:0 -' + Math.round(seg[0]*scaleDisp) + 'px','border-radius:14px','box-shadow:0 4px 18px rgba(0,0,0,0.10)','margin-bottom:' + (idx === segments.length-1 ? '8px' : '14px'),'overflow:hidden'].join(';');
-    wrap.appendChild(card);
+    var segH = seg[1] - seg[0];
+    var kart = document.createElement('div');
+    kart.className = 'zi-parca' + (idx === 0 ? ' zi-tam' : '');
+    /* YUZDE tabanli konumlandirma: piksel hesabi ekran genisligine baglidir ve
+       pencere yeniden boyutlandirilinca bozulurdu. Yuzdeyle her genislikte
+       dogru kalir, yeniden hesap gerekmez.
+         padding-top  = parcaYuksekligi / gorselGenisligi
+         position-y % = parcaUst / (gorselYuksekligi - parcaYuksekligi)   */
+    var oran = (segH / naturalW) * 100;
+    var kalan = naturalH - segH;
+    var posY = kalan > 0 ? (seg[0] / kalan) * 100 : 0;
+    kart.style.cssText = 'padding-top:' + oran.toFixed(4) + '%;' +
+      'background-image:url(' + src + ');' +
+      'background-position:0 ' + posY.toFixed(4) + '%;';
+    izgara.appendChild(kart);
   });
+  wrap.appendChild(izgara);
 }
 function zi_buildFallbackImg(wrap, src){
   wrap.innerHTML = '';
   var img = document.createElement('img');
-  img.src = src;img.alt = 'Urun Detaylari';
-  img.style.cssText = 'display:block;width:100%;max-width:480px;height:auto;border-radius:14px;box-shadow:0 4px 18px rgba(0,0,0,0.10);';
+  img.src = src; img.alt = 'Ürün Detayları'; img.loading = 'lazy';
+  img.style.cssText = 'display:block;width:100%;height:auto;border-radius:12px;';
   wrap.appendChild(img);
 }
 function zi_renderSliced(wrap, src){
-  var img = new Image();img.crossOrigin = 'anonymous';
+  var img = new Image(); img.crossOrigin = 'anonymous';
   img.onload = function(){
-    try {var segments = zi_computeSegments(img);zi_buildCards(wrap, src, img.naturalWidth, img.naturalHeight, segments);} catch(e){zi_buildFallbackImg(wrap, src);}
+    try { zi_buildCards(wrap, src, img.naturalWidth, img.naturalHeight, zi_computeSegments(img)); }
+    catch(e){ zi_buildFallbackImg(wrap, src); }   /* canvas/CORS engeli - tek parca goster */
   };
-  img.onerror = function(){};
+  img.onerror = function(){ wrap.remove(); };
   img.src = src;
+}
+/* Gorsel ~230KB - sayfa acilirken indirmeye gerek yok. Blok ekrana yaklasinca
+   yukle (siteyi yormadan). IntersectionObserver yoksa hemen yukle. */
+function zi_gorununceYukle(wrap, src){
+  if(!('IntersectionObserver' in window)){ zi_renderSliced(wrap, src); return; }
+  var go = new IntersectionObserver(function(girisler){
+    for(var i=0;i<girisler.length;i++){
+      if(girisler[i].isIntersecting){ go.disconnect(); zi_renderSliced(wrap, src); return; }
+    }
+  }, {rootMargin: '600px 0px'});
+  go.observe(wrap);
 }
 function zi_applyImage(imgId){
   var existing = document.getElementById('zengin-icerik-blok');
-  var tabContent = document.querySelector('.product-detail-tabs-main .tab-content');
-  if(!imgId){if(existing) existing.remove();return;}
-  if(!tabContent){ return; }
-  var src = 'https://cdn.myikas.com/images/'+ZI_MERCHANT+'/'+imgId+'/image_1080.webp';
-  if(existing && existing.getAttribute('data-imgid') === imgId) return;
+  /* Tam genislik icin urun gorselleri kolonunun ARDINA giriyoruz - eskiden
+     sagdaki dar "Urun Aciklamasi" akordiyonunun (344px) icindeydi ve 1080px
+     icin tasarlanmis gorsel orada okunmuyordu. */
+  var slider = document.querySelector('.product-detail-page-slider-main');
+  if(!imgId || !slider){ if(existing) existing.remove(); return; }
+  if(existing && existing.getAttribute('data-imgid') === imgId && existing.getAttribute('data-v') === ZI_SURUM) return;
   if(existing) existing.remove();
+  var src = 'https://cdn.myikas.com/images/'+ZI_MERCHANT+'/'+imgId+'/image_1080.webp';
   var wrap = document.createElement('div');
-  wrap.id = 'zengin-icerik-blok';wrap.setAttribute('data-imgid', imgId);
-  wrap.style.cssText = 'display:block;width:100%;max-width:480px;margin:20px auto 8px auto;';
-  tabContent.insertBefore(wrap, tabContent.firstChild);
-  zi_renderSliced(wrap, src);
+  wrap.id = 'zengin-icerik-blok';
+  wrap.setAttribute('data-imgid', imgId);
+  wrap.setAttribute('data-v', ZI_SURUM);
+  /* 1000px: hero neredeyse 1:1 (kaynak 1080px), kartlar ~490px. Daha genis kap
+     sayfayi gereksiz uzatiyor, daha dar kap yaziyi kucultuyor. */
+  wrap.style.cssText = 'grid-column:1 / -1;width:100%;max-width:1000px;margin:24px auto 8px;box-sizing:border-box;';
+  slider.insertAdjacentElement('afterend', wrap);
+  zi_gorununceYukle(wrap, src);
 }
 function zi_applyFromNextDataObject(dataObj){
   var psd = zi_findPageSpecificData(dataObj, 0);
@@ -297,13 +348,12 @@ function zi_applyFromNextDataObject(dataObj){
   zi_applyImage(imgId);
 }
 function ccZenginIcerik(){
-  var isProductPage = !!document.querySelector('.product-detail-tabs-main');
-  if(!isProductPage) return;
+  var slider = document.querySelector('.product-detail-page-slider-main');
+  var mevcut = document.getElementById('zengin-icerik-blok');
+  if(!slider){ if(mevcut) mevcut.remove(); return; }
   var data = cc_sayfaVerisi();      /* ortak onbellek - bayat veriye asla guvenmez */
-  if(!data) return;                 /* veri hazir degil, gelince schedule() tekrar cagirir */
-  var path = location.pathname;
-  if(path === zi_lastPath) return;
-  zi_lastPath = path;
+  /* Veri hazir degilse ONCEKI urunun zengin icerigini ekranda birakma */
+  if(!data){ if(mevcut) mevcut.remove(); return; }
   zi_applyFromNextDataObject(data);
 }
 
@@ -455,7 +505,10 @@ function ccTrendyolVitrin(){
   if(!vitrinTamam){
     var yeni = ty_vitrinOlustur(ty_veri.icerikler[cid]);
     yeni.setAttribute("data-cid", cid);yeni.setAttribute("data-v", "9");
-    slider.insertAdjacentElement("afterend", yeni);
+    /* SIRA: gorseller -> zengin icerik -> yorumlar. Zengin icerik blogu varsa
+       onun ardina gir, yoksa dogrudan gorsellerin ardina. */
+    var capa = document.getElementById("zengin-icerik-blok") || slider;
+    capa.insertAdjacentElement("afterend", yeni);
   }
   if(buyBox && !ozetTamam){
     var ozet = ty_ozetKartiOlustur(ty_veri.icerikler[cid]);
