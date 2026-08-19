@@ -1,10 +1,12 @@
 name: Trendyol yorumlarini tazele
 
 on:
-  schedule:
-    # Her 3 gunde bir, gece 03:00 UTC (06:00 TR) - GitHub'in kendi
-    # sunucusunda calisir, yerel makine acik olmak ZORUNDA DEGIL.
-    - cron: "0 3 */3 * *"
+  # Otomatik cron KALDIRILDI (2026-08-19): GitHub Actions runner'larinin
+  # paylasimli IP'si Trendyol tarafindan TAMAMEN engelleniyor - canli testte
+  # 368/368 urun 429 aldi, guvenlik esigi eski veriyi korudu ama yeni veri
+  # hic gelmedi. Zamanlama artik yerel makinede Windows Task Scheduler ile
+  # yapiliyor (gorev: Cocukland-TrendyolYorumTazele, C:\Orvis\veri\cocukland-widgets\yerel_yorum_tazele.ps1).
+  # workflow_dispatch elde tutuluyor - manuel/hata ayiklama icin hala isler.
   workflow_dispatch: {}
 
 jobs:
