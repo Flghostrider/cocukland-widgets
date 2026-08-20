@@ -208,7 +208,7 @@ function cc_sayfaVerisi(){
 }
 
 /* ---------- 3) Urun sayfasi zengin icerik gorseli (parcalara ayirip kart olarak gosterir) ---------- */
-var ZI_SURUM='5';
+var ZI_SURUM='6';
 var ZI_ATTR_ID='67c8a4df-47a0-4fd4-9e96-c7f1ccc4f27d';
 var ZI_MERCHANT='96c43624-0d17-4eb1-b5bd-60d0743043e7';
 function zi_findPageSpecificData(obj, depth){
@@ -259,30 +259,56 @@ function zi_computeSegments(img){
   var ESIK = Math.round(30 * scale);
   var secili = [];
   for(var s=0;s<bloklar.length;s++){ if(bloklar[s][2] >= ESIK) secili.push(bloklar[s]); }
-  var kesim = [0];
-  for(var k=0;k<secili.length;k++) kesim.push(Math.round((secili[k][0]+secili[k][1])/2));
-  kesim.push(ch);
-  var kesimOrijinal = kesim.map(function(v){ return Math.round(v/scale); });
+
+  /* SIKI KIRPMA (2026-08-20): eskiden her bosluktan TAM ORTADAN kesiliyordu,
+     yani her kartin ust/alt kenarinda bosluğun YARISI kadar beyaz gomulu
+     kalıyordu (orn. 180px'lik bir bosluk -> kartin icinde 90px beyaz).
+     Izgara araligiyla (16px) ust uste binince kartlar birbirinden kopuk,
+     "araları bomboş" duruyordu. Simdi her kart, gercek icerigin kenarina
+     sadece kucuk bir nefes payiyla (PAD) kirpiliyor - bosluğun geri kalani
+     karta hic girmiyor. */
+  var PAD = 10; // orijinal piksel - kartin kendi icindeki nefes payi
+  var bosluklarOrijinal = secili.map(function(b){
+    return [Math.round(b[0]/scale), Math.round(b[1]/scale)];
+  });
   var parcalar = [];
-  for(var k2=0;k2<kesimOrijinal.length-1;k2++){
-    var top = kesimOrijinal[k2], bot = kesimOrijinal[k2+1];
-    /* cok ince kalan artiklari bir oncekine yapistir */
-    if(parcalar.length && (bot-top) < 120){parcalar[parcalar.length-1][1] = bot;} else {parcalar.push([top, bot]);}
+  var cur = 0;
+  for(var k=0;k<bosluklarOrijinal.length;k++){
+    var gs = bosluklarOrijinal[k][0], ge = bosluklarOrijinal[k][1];
+    var pad = Math.min(PAD, Math.floor((ge-gs)/2));
+    var segEnd = gs + pad;
+    if(segEnd > cur) parcalar.push([cur, segEnd]);
+    cur = ge - pad;
   }
+  if(cur < h) parcalar.push([cur, h]);
+  /* cok ince kalan artiklari bir oncekine yapistir */
+  var birlesmis = [];
+  for(var k3=0;k3<parcalar.length;k3++){
+    var seg = parcalar[k3];
+    if(birlesmis.length && (seg[1]-seg[0]) < 120){ birlesmis[birlesmis.length-1][1] = seg[1]; }
+    else birlesmis.push(seg);
+  }
+  parcalar = birlesmis;
   if(!parcalar.length) parcalar = [[0, h]];
   return parcalar;
 }
 function zi_stilEkle(){
   if(document.getElementById('zi-stil')) return;
   var st = document.createElement('style'); st.id = 'zi-stil';
-  /* Tek sutun varsayilan; genis ekranda IKI sutun. Iki sutun sart: tek sutunda
-     1080px'lik A+ gorseli okunakli genislikte gostermek sayfayi ~8000px'e
-     cikariyor. Iki sutun hem okunakli hem makul boyda tutuyor. */
+  /* CSS GRID DEGIL, CSS COLUMNS (masonry benzeri) (2026-08-20): kartlar
+     dogasi geregi cok farkli yukseklikte (uzun urun fotosu vs kisa ozellik
+     ikonu). Grid'de N-sutunluk her SATIR en uzun kartina gore yukseklik
+     alir, kisa kartlarin altinda kocaman bos beyaz alan kalirdi (canli
+     ornekte BEJ/GRİ hero karti ile KOYU GRİ kisa karti ayni satirda -
+     hero'nun altinda 500px bosluk). CSS columns her sutunu BAGIMSIZ
+     doldurur, satir hizalamasi yok, boslugun kaynagi ortadan kalkiyor. */
   st.textContent =
-    '#zengin-icerik-blok .zi-izgara{display:grid;grid-template-columns:1fr;gap:14px;align-items:start;}' +
-    '#zengin-icerik-blok .zi-parca{width:100%;background-repeat:no-repeat;background-size:100% auto;border-radius:12px;overflow:hidden;}' +
-    '@media(min-width:700px){#zengin-icerik-blok .zi-izgara{grid-template-columns:1fr 1fr;gap:16px;}}' +
-    '@media(min-width:1100px){#zengin-icerik-blok .zi-izgara{grid-template-columns:1fr 1fr 1fr;gap:16px;}}';
+    '#zengin-icerik-blok .zi-izgara{column-count:1;column-gap:16px;}' +
+    '#zengin-icerik-blok .zi-parca{width:100%;display:inline-block;vertical-align:top;' +
+      'break-inside:avoid;-webkit-column-break-inside:avoid;page-break-inside:avoid;margin:0 0 16px;' +
+      'background-repeat:no-repeat;background-size:100% auto;border-radius:12px;overflow:hidden;}' +
+    '@media(min-width:700px){#zengin-icerik-blok .zi-izgara{column-count:2;}}' +
+    '@media(min-width:1100px){#zengin-icerik-blok .zi-izgara{column-count:3;}}';
   document.head.appendChild(st);
 }
 function zi_buildCards(wrap, src, naturalW, naturalH, segments){
