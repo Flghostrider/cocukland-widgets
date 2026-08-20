@@ -155,6 +155,19 @@ function ccBedenTablosu(){
   if(ours&&img.src!==target){img.src=target;img.srcset='';}
 }
 
+/* ---------- ORTAK: tam genislikli bloklarin baglanacagi yer ----------
+   KRITIK: Urun gorselleri (.product-detail-page-slider-main) ile satin alma
+   kutusu (.product-detail-page-detail-box) AYNI CSS grid'inin cocuklaridir.
+   Araya tam genislikli (grid-column:1/-1) bir blok sokulursa satin alma
+   kutusu ALT SATIRA itiliyor - canli olarak "SEPETE EKLE 5000px asagi gitti"
+   seklinde patladi (2026-08-20).
+   Bu yuzden kendi bloklarimizi grid'in ICINE degil, grid'in TAMAMEN ARDINA
+   koyuyoruz: urun alani bozulmadan kalir, bloklar altina dizilir. */
+function cc_urunAlaniIzgarasi(){
+  var slider = document.querySelector('.product-detail-page-slider-main');
+  return slider ? slider.parentElement : null;
+}
+
 /* ---------- ORTAK: gecerli sayfanin __NEXT_DATA__'si ----------
    KRITIK: Next.js, SPA (yumusak) gecislerde sayfadaki __NEXT_DATA__ script
    etiketini GUNCELLEMIYOR - ilk sunucu render'indan kalan veri orada oyle
@@ -209,7 +222,7 @@ function cc_sayfaVerisi(){
 }
 
 /* ---------- 3) Urun sayfasi zengin icerik gorseli (parcalara ayirip kart olarak gosterir) ---------- */
-var ZI_SURUM='3';
+var ZI_SURUM='4';
 var ZI_ATTR_ID='67c8a4df-47a0-4fd4-9e96-c7f1ccc4f27d';
 var ZI_MERCHANT='96c43624-0d17-4eb1-b5bd-60d0743043e7';
 function zi_findPageSpecificData(obj, depth){
@@ -341,11 +354,10 @@ function zi_yakinMi(el){
 }
 function zi_applyImage(imgId){
   var existing = document.getElementById('zengin-icerik-blok');
-  /* Tam genislik icin urun gorselleri kolonunun ARDINA giriyoruz - eskiden
-     sagdaki dar "Urun Aciklamasi" akordiyonunun (344px) icindeydi ve 1080px
-     icin tasarlanmis gorsel orada okunmuyordu. */
-  var slider = document.querySelector('.product-detail-page-slider-main');
-  if(!imgId || !slider){ if(existing) existing.remove(); return; }
+  /* Urun alani grid'inin TAMAMEN ardina - grid'in icine girerse satin alma
+     kutusunu alt satira itiyor (bkz. cc_urunAlaniIzgarasi aciklamasi). */
+  var izgaraKap = cc_urunAlaniIzgarasi();
+  if(!imgId || !izgaraKap){ if(existing) existing.remove(); return; }
   var src = 'https://cdn.myikas.com/images/'+ZI_MERCHANT+'/'+imgId+'/image_1080.webp';
   if(existing && existing.getAttribute('data-imgid') === imgId && existing.getAttribute('data-v') === ZI_SURUM){
     /* Blok yerinde; ekrana yaklastiysa ve henuz doldurulmadiysa simdi doldur */
@@ -365,8 +377,8 @@ function zi_applyImage(imgId){
   /* min-height ZORUNLU: yuksekligi 0 olan yer tutucu IntersectionObserver'a
      hicbir zaman "gorunur" gelmiyor (canli dogrulandi 2026-08-19) ve tembel
      yukleme hic tetiklenmiyordu. Ayrica yuklenirken sayfa zipplamasini onler. */
-  wrap.style.cssText = 'grid-column:1 / -1;width:100%;max-width:1000px;margin:24px auto 8px;box-sizing:border-box;min-height:320px;';
-  slider.insertAdjacentElement('afterend', wrap);
+  wrap.style.cssText = 'display:block;width:100%;max-width:1000px;margin:8px auto 24px;box-sizing:border-box;min-height:320px;';
+  izgaraKap.insertAdjacentElement('afterend', wrap);
   /* Zaten ekrana yakinsa hemen doldur; degilse sonraki renderAll turlerinde
      (kaydirma/gozlemci/2sn dongusu) yakinlik kontrolu yapilir. */
   if(zi_yakinMi(wrap)){
@@ -476,7 +488,7 @@ function ty_vitrinOlustur(icerik){
   var ortalama = (icerik && !Array.isArray(icerik) && icerik.ortalamaPuan != null) ? icerik.ortalamaPuan : ty_ortalamaHesapla(yorumlar);
   var toplamYorum = (icerik && !Array.isArray(icerik) && icerik.toplamYorum != null) ? icerik.toplamYorum : yorumlar.length;
   var wrap = document.createElement("div");wrap.id = TY_VITRIN_ID;
-  wrap.style.cssText = "grid-column:1 / -1;width:100%;box-sizing:border-box;margin:20px 0 28px;font-family:inherit;";
+  wrap.style.cssText = "display:block;width:100%;box-sizing:border-box;margin:20px 0 28px;font-family:inherit;";
   var ustSatir = document.createElement("div");ustSatir.style.cssText = "display:flex;align-items:center;gap:10px;margin-bottom:2px;padding:0 4px;flex-wrap:wrap;";
   var rozet = document.createElement("span");rozet.textContent = "Trendyol";
   rozet.style.cssText = "background:" + TY_TURUNCU + ";color:#fff;font-size:11px;font-weight:700;padding:3px 9px;border-radius:5px;letter-spacing:0.3px;";
@@ -509,11 +521,11 @@ function ty_vitrinOlustur(icerik){
   return wrap;
 }
 function ccTrendyolVitrin(){
-  var slider = document.querySelector(".product-detail-page-slider-main");
+  var izgaraKap = cc_urunAlaniIzgarasi();
   var buyBox = document.querySelector(".product-detail-page-detail-price-box");
   var mevcut = document.getElementById(TY_VITRIN_ID);
   var mevcutOzet = document.getElementById(TY_OZET_ID);
-  if(!slider){ if(mevcut) mevcut.remove(); if(mevcutOzet) mevcutOzet.remove(); return; }
+  if(!izgaraKap){ if(mevcut) mevcut.remove(); if(mevcutOzet) mevcutOzet.remove(); return; }
   if(ty_veri === null){ ty_veriGetir(); return; } // henuz gelmedi, sonraki dongude tekrar denenir
   if(!ty_veri){ if(mevcut) mevcut.remove(); if(mevcutOzet) mevcutOzet.remove(); return; }
   var barkodlar = ty_tumBarkodlar();
@@ -529,22 +541,22 @@ function ccTrendyolVitrin(){
   if(!cid || !ty_veri.icerikler[cid] || !ty_liste(ty_veri.icerikler[cid]).length){
     if(mevcut) mevcut.remove(); if(mevcutOzet) mevcutOzet.remove(); return;
   }
-  var vitrinTamam = mevcut && mevcut.getAttribute("data-cid") === cid && mevcut.getAttribute("data-v") === "9";
-  var ozetTamam = mevcutOzet && mevcutOzet.getAttribute("data-cid") === cid && mevcutOzet.getAttribute("data-v") === "9";
+  var vitrinTamam = mevcut && mevcut.getAttribute("data-cid") === cid && mevcut.getAttribute("data-v") === "10";
+  var ozetTamam = mevcutOzet && mevcutOzet.getAttribute("data-cid") === cid && mevcutOzet.getAttribute("data-v") === "10";
   if(vitrinTamam && ozetTamam) return;
   if(!vitrinTamam && mevcut){ mevcut.remove(); mevcut = null; }
   if(!ozetTamam && mevcutOzet){ mevcutOzet.remove(); mevcutOzet = null; }
   if(!vitrinTamam){
     var yeni = ty_vitrinOlustur(ty_veri.icerikler[cid]);
-    yeni.setAttribute("data-cid", cid);yeni.setAttribute("data-v", "9");
-    /* SIRA: gorseller -> zengin icerik -> yorumlar. Zengin icerik blogu varsa
-       onun ardina gir, yoksa dogrudan gorsellerin ardina. */
-    var capa = document.getElementById("zengin-icerik-blok") || slider;
+    yeni.setAttribute("data-cid", cid);yeni.setAttribute("data-v", "10");
+    /* SIRA: urun alani -> zengin icerik -> yorumlar. Grid'in ICINE degil
+       ardina (grid icine girerse satin alma kutusu alt satira itiliyor). */
+    var capa = document.getElementById("zengin-icerik-blok") || izgaraKap;
     capa.insertAdjacentElement("afterend", yeni);
   }
   if(buyBox && !ozetTamam){
     var ozet = ty_ozetKartiOlustur(ty_veri.icerikler[cid]);
-    ozet.setAttribute("data-cid", cid);ozet.setAttribute("data-v", "9");
+    ozet.setAttribute("data-cid", cid);ozet.setAttribute("data-v", "10");
     buyBox.insertAdjacentElement("beforebegin", ozet);
   }
 }
