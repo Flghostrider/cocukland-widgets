@@ -55,6 +55,32 @@ indirir. Degistirmek icin: `cocukland-seo/ikas_script_guncelle.py`
 Not: Ikas sayfa HTML'i Cloudflare'de `s-maxage=200` ile onbelleklenir -
 script etiketi degisiklikleri birkac dakika sonra gorunur.
 
+## Zengin Icerik (A+ gorsel)
+
+Urun ozniteligi `67c8a4df-47a0-4fd4-9e96-c7f1ccc4f27d` altindaki tek uzun
+gorsel (ornek: 1080x9641) beyaz bosluklardan dilimlenip kart izgarasi olarak
+gosterilir. Konum: urun gorsellerinin ardinda, TAM GENISLIK, max-width 1000px.
+Sayfa sirasi: **gorseller -> zengin icerik -> yorumlar**.
+
+- **Kesim esigi 60px**: olculdu (2026-08-19) blok ARASI bosluklar 65-180px,
+  blok ICI 14-40px. Onceden "en buyuk 9 bosluk" seciliyordu ve iki ozellik
+  ayni karta sikisiyordu.
+- **Iki sutun** (>=900px): tek sutunda okunakli genislik sayfayi ~8000px'e
+  cikariyor. Iki sutun ~3700px'te tutuyor, kartlar ~490px.
+- **Yuzde tabanli arka plan konumu**: `padding-top = dilimH/gorselW`,
+  `background-position-y = dilimUst/(gorselH-dilimH)`. Piksel hesabi pencere
+  yeniden boyutlandirilinca bozuluyordu; yuzde her genislikte dogru.
+- **Tembel yukleme**: `zi_yakinMi()` + getBoundingClientRect.
+  IntersectionObserver KULLANMA - sayfa compositing yapmadiginda (arka plan
+  sekmesi, gomulu webview, basliksiz tarayici) callback HIC tetiklenmiyor ve
+  blok sonsuza kadar bos kaliyor (canli dogrulandi).
+- **min-height yer tutucu** zorunlu: yuksekligi 0 olan blok hem gorunurluk
+  kontrollerini bozar hem yuklenince sayfayi ziplatir.
+
+KAPSAM: 438 urunun sadece 4'unde bu oznitelik dolu. Geri kalani icin urun
+basina A+ gorseli hazirlanip Ikas'ta oznitelige yuklenmesi gerekiyor - kod
+tarafinda yapilacak bir sey yok.
+
 ## Trendyol yorum verisi
 
 Veri bundle'a GOMULU DEGIL; `data/yorumlar.json` urun sayfalarinda
