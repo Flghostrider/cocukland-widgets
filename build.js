@@ -209,7 +209,7 @@ function cc_sayfaVerisi(){
 }
 
 /* ---------- 3) Urun sayfasi zengin icerik gorseli (parcalara ayirip kart olarak gosterir) ---------- */
-var ZI_SURUM='2';
+var ZI_SURUM='3';
 var ZI_ATTR_ID='67c8a4df-47a0-4fd4-9e96-c7f1ccc4f27d';
 var ZI_MERCHANT='96c43624-0d17-4eb1-b5bd-60d0743043e7';
 function zi_findPageSpecificData(obj, depth){
@@ -327,16 +327,17 @@ function zi_renderSliced(wrap, src){
   img.onerror = function(){ wrap.remove(); };
   img.src = src;
 }
-/* Gorsel ~230KB - sayfa acilirken indirmeye gerek yok. Blok ekrana yaklasinca
-   yukle (siteyi yormadan). IntersectionObserver yoksa hemen yukle. */
-function zi_gorununceYukle(wrap, src){
-  if(!('IntersectionObserver' in window)){ zi_renderSliced(wrap, src); return; }
-  var go = new IntersectionObserver(function(girisler){
-    for(var i=0;i<girisler.length;i++){
-      if(girisler[i].isIntersecting){ go.disconnect(); zi_renderSliced(wrap, src); return; }
-    }
-  }, {rootMargin: '600px 0px'});
-  go.observe(wrap);
+/* Gorsel ~230KB - sayfa acilirken indirmeye gerek yok, blok ekrana yaklasinca
+   yuklenir (siteyi yormadan).
+
+   IntersectionObserver KULLANILMIYOR: bazi ortamlarda (sayfa compositing
+   yapmadiginda - arka plan sekmesi, gomulu webview, basliksiz tarayici)
+   callback HIC tetiklenmiyor ve zengin icerik sonsuza kadar bos kaliyor
+   (canli dogrulandi 2026-08-19). getBoundingClientRect her ortamda calisir;
+   zaten donen renderAll dongusunde kontrol etmek hem bedava hem guvenli. */
+function zi_yakinMi(el){
+  var r = el.getBoundingClientRect();
+  return r.top < (window.innerHeight || 0) + 600 && r.bottom > -600;
 }
 function zi_applyImage(imgId){
   var existing = document.getElementById('zengin-icerik-blok');
@@ -345,9 +346,16 @@ function zi_applyImage(imgId){
      icin tasarlanmis gorsel orada okunmuyordu. */
   var slider = document.querySelector('.product-detail-page-slider-main');
   if(!imgId || !slider){ if(existing) existing.remove(); return; }
-  if(existing && existing.getAttribute('data-imgid') === imgId && existing.getAttribute('data-v') === ZI_SURUM) return;
-  if(existing) existing.remove();
   var src = 'https://cdn.myikas.com/images/'+ZI_MERCHANT+'/'+imgId+'/image_1080.webp';
+  if(existing && existing.getAttribute('data-imgid') === imgId && existing.getAttribute('data-v') === ZI_SURUM){
+    /* Blok yerinde; ekrana yaklastiysa ve henuz doldurulmadiysa simdi doldur */
+    if(existing.getAttribute('data-yuklendi') !== '1' && zi_yakinMi(existing)){
+      existing.setAttribute('data-yuklendi', '1');
+      zi_renderSliced(existing, src);
+    }
+    return;
+  }
+  if(existing) existing.remove();
   var wrap = document.createElement('div');
   wrap.id = 'zengin-icerik-blok';
   wrap.setAttribute('data-imgid', imgId);
@@ -359,7 +367,12 @@ function zi_applyImage(imgId){
      yukleme hic tetiklenmiyordu. Ayrica yuklenirken sayfa zipplamasini onler. */
   wrap.style.cssText = 'grid-column:1 / -1;width:100%;max-width:1000px;margin:24px auto 8px;box-sizing:border-box;min-height:320px;';
   slider.insertAdjacentElement('afterend', wrap);
-  zi_gorununceYukle(wrap, src);
+  /* Zaten ekrana yakinsa hemen doldur; degilse sonraki renderAll turlerinde
+     (kaydirma/gozlemci/2sn dongusu) yakinlik kontrolu yapilir. */
+  if(zi_yakinMi(wrap)){
+    wrap.setAttribute('data-yuklendi', '1');
+    zi_renderSliced(wrap, src);
+  }
 }
 function zi_applyFromNextDataObject(dataObj){
   var psd = zi_findPageSpecificData(dataObj, 0);
@@ -558,6 +571,9 @@ var observer=new MutationObserver(function(mutations){
 observer.observe(document.documentElement,{childList:true,subtree:true,characterData:true,attributes:true,attributeFilter:['src']});
 setInterval(renderAll, 2000);
 window.addEventListener('resize', ccBedenTablosu);
+/* Zengin icerik ekrana yaklasinca hemen yuklensin (2sn dongusunu beklemesin).
+   schedule() 150ms debounce'li - kaydirma sirasinda tek is calisir. */
+window.addEventListener('scroll', schedule, {passive:true});
 schedule();
 document.addEventListener('DOMContentLoaded',schedule);
 })();
