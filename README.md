@@ -84,11 +84,14 @@ gorsel (ornek: 1080x9641) beyaz bosluklardan dilimlenip kart izgarasi olarak
 gosterilir. Konum: urun gorsellerinin ardinda, TAM GENISLIK, max-width 1000px.
 Sayfa sirasi: **gorseller -> zengin icerik -> yorumlar**.
 
-- **Kesim esigi 60px**: olculdu (2026-08-19) blok ARASI bosluklar 65-180px,
-  blok ICI 14-40px. Onceden "en buyuk 9 bosluk" seciliyordu ve iki ozellik
-  ayni karta sikisiyordu.
-- **Iki sutun** (>=900px): tek sutunda okunakli genislik sayfayi ~8000px'e
-  cikariyor. Iki sutun ~3700px'te tutuyor, kartlar ~490px.
+- **Kesim esigi 30px**: 60'ta ust bolum (marka basligi + yasam tarzi foto +
+  renk varyantlari) tek bir 1400px'lik dev parca kaliyordu. 30, oradaki
+  32/40px'lik bosluklari da yakalayip dengeli parcalara boluyor -> 22 parca.
+  Kart yukseklikleri esitlendigi icin izgara satirlarinda bosluk da kalmiyor.
+- **Uc sutun** (>=1100px) / iki sutun (>=700px) / tek sutun (mobil).
+  Canli olculen toplam boy: 1080px kapta **1460px** (onceki iki sutunlu
+  hali 3696px'ti - %60 kisalma). Kartlar 349px; okunabilirlik gorsel olarak
+  dogrulandi ve mobildeki tek sutun (~375px) ile neredeyse ayni olcek.
 - **Yuzde tabanli arka plan konumu**: `padding-top = dilimH/gorselW`,
   `background-position-y = dilimUst/(gorselH-dilimH)`. Piksel hesabi pencere
   yeniden boyutlandirilinca bozuluyordu; yuzde her genislikte dogru.
