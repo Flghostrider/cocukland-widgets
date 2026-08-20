@@ -208,7 +208,7 @@ function cc_sayfaVerisi(){
 }
 
 /* ---------- 3) Urun sayfasi zengin icerik gorseli (parcalara ayirip kart olarak gosterir) ---------- */
-var ZI_SURUM='4';
+var ZI_SURUM='5';
 var ZI_ATTR_ID='67c8a4df-47a0-4fd4-9e96-c7f1ccc4f27d';
 var ZI_MERCHANT='96c43624-0d17-4eb1-b5bd-60d0743043e7';
 function zi_findPageSpecificData(obj, depth){
@@ -250,11 +250,13 @@ function zi_computeSegments(img){
     if(bos[i2]){var j=i2;while(j<ch && bos[j]) j++;if(j-i2 >= 4) bloklar.push([i2,j,j-i2]);i2=j;} else i2++;
   }
   /* ESIK TABANLI KESIM: "en buyuk 9 bosluk" secmek yerine, belirli bir
-     yukseklikten BUYUK her bosluktan kesiyoruz. Cocukland'in A+ gorsellerinde
-     olculdu (2026-08-19): blok ARASI bosluklar 65-180px, blok ICI bosluklar
-     14-40px. 60px esigi ikisini temiz ayirir; boylece her ozellik blogu kendi
-     karti olur, iki ozellik ayni karta sikismaz. */
-  var ESIK = Math.round(60 * scale);
+     yukseklikten BUYUK her bosluktan kesiyoruz.
+     Esik 60 -> 30 dusuruldu (2026-08-20): 60'ta ust bolum (marka basligi +
+     yasam tarzi foto + renk varyantlari) tek bir 1400px'lik dev parca
+     kaliyordu ve sayfayi asiri uzatiyordu. 30, o bolumdeki 32/40px'lik
+     bosluklari da yakalayip 4 dengeli parcaya boluyor - kartlar esitlenince
+     izgara satirlarinda bosluk kalmiyor ve toplam boy ciddi kisaliyor. */
+  var ESIK = Math.round(30 * scale);
   var secili = [];
   for(var s=0;s<bloklar.length;s++){ if(bloklar[s][2] >= ESIK) secili.push(bloklar[s]); }
   var kesim = [0];
@@ -265,7 +267,7 @@ function zi_computeSegments(img){
   for(var k2=0;k2<kesimOrijinal.length-1;k2++){
     var top = kesimOrijinal[k2], bot = kesimOrijinal[k2+1];
     /* cok ince kalan artiklari bir oncekine yapistir */
-    if(parcalar.length && (bot-top) < 180){parcalar[parcalar.length-1][1] = bot;} else {parcalar.push([top, bot]);}
+    if(parcalar.length && (bot-top) < 120){parcalar[parcalar.length-1][1] = bot;} else {parcalar.push([top, bot]);}
   }
   if(!parcalar.length) parcalar = [[0, h]];
   return parcalar;
@@ -279,10 +281,8 @@ function zi_stilEkle(){
   st.textContent =
     '#zengin-icerik-blok .zi-izgara{display:grid;grid-template-columns:1fr;gap:14px;align-items:start;}' +
     '#zengin-icerik-blok .zi-parca{width:100%;background-repeat:no-repeat;background-size:100% auto;border-radius:12px;overflow:hidden;}' +
-    '@media(min-width:900px){' +
-      '#zengin-icerik-blok .zi-izgara{grid-template-columns:1fr 1fr;gap:18px;}' +
-      '#zengin-icerik-blok .zi-parca.zi-tam{grid-column:1 / -1;}' +
-    '}';
+    '@media(min-width:700px){#zengin-icerik-blok .zi-izgara{grid-template-columns:1fr 1fr;gap:16px;}}' +
+    '@media(min-width:1100px){#zengin-icerik-blok .zi-izgara{grid-template-columns:1fr 1fr 1fr;gap:16px;}}';
   document.head.appendChild(st);
 }
 function zi_buildCards(wrap, src, naturalW, naturalH, segments){
@@ -293,7 +293,7 @@ function zi_buildCards(wrap, src, naturalW, naturalH, segments){
   segments.forEach(function(seg, idx){
     var segH = seg[1] - seg[0];
     var kart = document.createElement('div');
-    kart.className = 'zi-parca' + (idx === 0 ? ' zi-tam' : '');
+    kart.className = 'zi-parca';
     /* YUZDE tabanli konumlandirma: piksel hesabi ekran genisligine baglidir ve
        pencere yeniden boyutlandirilinca bozulurdu. Yuzdeyle her genislikte
        dogru kalir, yeniden hesap gerekmez.
@@ -363,7 +363,7 @@ function zi_applyImage(imgId){
   /* min-height ZORUNLU: yuksekligi 0 olan yer tutucu IntersectionObserver'a
      hicbir zaman "gorunur" gelmiyor (canli dogrulandi 2026-08-19) ve tembel
      yukleme hic tetiklenmiyordu. Ayrica yuklenirken sayfa zipplamasini onler. */
-  wrap.style.cssText = 'display:block;width:100%;max-width:1000px;margin:8px auto 24px;box-sizing:border-box;min-height:320px;';
+  wrap.style.cssText = 'display:block;width:100%;max-width:1080px;margin:8px auto 24px;box-sizing:border-box;min-height:320px;';
   izgaraKap.insertAdjacentElement('afterend', wrap);
   /* Zaten ekrana yakinsa hemen doldur; degilse sonraki renderAll turlerinde
      (kaydirma/gozlemci/2sn dongusu) yakinlik kontrolu yapilir. */
