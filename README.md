@@ -30,27 +30,49 @@ guvenme. Bunun yerine `cc_sayfaVerisi()` kullan:
 - veri hazir degilken `null` doner -> widget'lar ONCEKI urunun icerigini
   ekranda BIRAKMAMALI, temizleyip beklemeli
 
-## !!! TUZAK 2: jsDelivr 7 GUN tarayici onbellegi
+## !!! TUZAK 2: Urun alani grid'inin ICINE blok sokma
+
+Urun gorselleri (`.product-detail-page-slider-main`) ile satin alma kutusu
+(`.product-detail-page-detail-box`) **ayni CSS grid'inin cocuklaridir**.
+Araya tam genislikli (`grid-column:1 / -1`) bir blok sokulursa grid, satin
+alma kutusunu ALT SATIRA tasir - 2026-08-20'de canlida "SEPETE EKLE" ~5000px
+asagi dustu ve urun sayfasi kullanilamaz hale geldi.
+
+Kendi tam genislikli bloklarimiz (zengin icerik, yorum vitrini) grid'in
+ICINE degil **TAMAMEN ARDINA** eklenir: `cc_urunAlaniIzgarasi()` grid'i
+dondurur, bloklar `izgaraKap.insertAdjacentElement('afterend', ...)` ile
+altina dizilir. Sira: urun alani -> zengin icerik -> yorumlar.
+
+## !!! TUZAK 3: jsDelivr 7 GUN tarayici onbellegi
 
 jsDelivr `Cache-Control: max-age=604800` gonderir. Sabit bir URL kullanilirsa
 bundle.js'i bir kez indirmis ziyaretcinin tarayicisi **7 gun** boyunca yeni
 surumu almaz - CDN purge edilse bile. Duzeltmeler canliya cikar ama musteri
 eski bozuk kodu gormeye devam eder.
 
-Bu yuzden Ikas'taki script etiketi artik URL'e **gunluk donen** bir surum
-parametresi ekleyen bir yukleyici (2026-08-19):
+Zaman tabanli surum parametreleri denendi, IKISI DE yetersiz kaldi:
+- **gunluk** (`?g=YYYY-M-D`): ayni gun icinde yapilan duzeltmeler
+  kullaniciya HIC ulasmiyordu
+- **saatlik** (`?g=YYYY-M-D-H`): kirik bir surum yayinlandiginda site bir
+  sonraki saate kadar bozuk kaliyordu - canli yasandi (SEPETE EKLE hatasi)
+
+**Cozum: commit SHA'sini YOLA sabitlemek** (2026-08-20):
 
 ```html
-<script>(function(){var g=new Date();
-var v=g.getUTCFullYear()+'-'+(g.getUTCMonth()+1)+'-'+g.getUTCDate();
-var s=document.createElement('script');
-s.src='https://cdn.jsdelivr.net/gh/Flghostrider/cocukland-widgets@master/bundle.js?g='+v;
-document.head.appendChild(s);})();</script>
+<script src="https://cdn.jsdelivr.net/gh/Flghostrider/cocukland-widgets@<SHA>/bundle.js" defer></script>
 ```
 
-Ayni gun icinde tarayici onbellekten okur (ek yuk yok), ertesi gun taze
-indirir. Degistirmek icin: `cocukland-seo/ikas_script_guncelle.py`
-(`dry` / `apply` / `restore`; yedek `ikas_script_yedek.json`).
+- URL her yayinda degisir -> duzeltme ANINDA ulasir
+- icerik hic degismez -> jsDelivr purge beklemeye gerek YOK, edge gecikmesi yok
+- sonsuza kadar onbelleklenebilir -> tekrarli indirme yok (en az yuk)
+
+### HER BUNDLE YAYININDAN SONRA
+```
+cd cocukland-seo && python ikas_script_guncelle.py apply
+```
+origin/master HEAD'ini otomatik okur ve Ikas etiketini gunceller.
+Belirli bir commit icin: `... apply <sha>`. Geri almak: `... restore`
+(yedek `ikas_script_yedek.json`). Bu adim ATLANIRSA yeni kod canliya CIKMAZ.
 
 Not: Ikas sayfa HTML'i Cloudflare'de `s-maxage=200` ile onbelleklenir -
 script etiketi degisiklikleri birkac dakika sonra gorunur.
