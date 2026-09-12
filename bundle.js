@@ -141,6 +141,25 @@ function ccBedenTablosu(){
   if(ours&&img.src!==target){img.src=target;img.srcset='';}
 }
 
+/* ---------- 2b) Mobilde renk varyanti kutulari SIKISIYOR (2026-09-12) ----------
+   Ikas temasinin kendi kodu .product-detail-page-variants icindeki her renk
+   kutusuna inline style="width:100px;height:150px" veriyor ama flex-shrink
+   varsayilan (1) kaldigi icin mobil genislikte (375px) butun kutular ~54px'e
+   (yarisindan azina) sikisiyor. Sonuc: renk adi kirpiliyor ("Lacivert" ->
+   "Lac...") VE icindeki gorsel (object-fit:contain, kendi oranini koruyor)
+   kutudan taşarak yan taraftaki renge biniyor.
+   NOT: Beden (variant-types class'i) bundan ETKILENMEZ - ayri bir sarmalayici,
+   canlida olculdu (100x47px, degismiyor).
+   Duz CSS ile duzeltiliyor (JS/DOM'a dokunmuyoruz, React yeniden render
+   etse de kalici - bkz. Trendyol vitrini notundaki JS-widget guvensizligi).
+   Canlida dogrulandi: kutular tekrar tam 100x150px, sikisma yok. */
+function ccVaryantKutuDuzelt(){
+  if(document.getElementById('cc-varyant-stil'))return;
+  var style=document.createElement('style');style.id='cc-varyant-stil';
+  style.textContent='@media(max-width:767px){.product-detail-page-variants>div{flex:0 0 100px !important;width:100px !important;}}';
+  document.head.appendChild(style);
+}
+
 /* ---------- ORTAK: tam genislikli bloklarin baglanacagi yer ----------
    KRITIK: Urun gorselleri (.product-detail-page-slider-main) ile satin alma
    kutusu (.product-detail-page-detail-box) AYNI CSS grid'inin cocuklaridir.
@@ -580,7 +599,7 @@ function isInsideOurs(node){
 }
 function renderAll(){
   ccShippingBar();ccBrandStrip();ccStoreInfo();ccCheckoutTrust();ccCategoryCount();ccProductDelivery();
-  ccBedenTablosu();ccZenginIcerik();ccTrendyolVitrin();
+  ccBedenTablosu();ccZenginIcerik();ccTrendyolVitrin();ccVaryantKutuDuzelt();
 }
 var scheduled=false;
 function schedule(){
