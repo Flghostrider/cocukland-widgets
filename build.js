@@ -174,6 +174,27 @@ function ccVaryantKutuDuzelt(){
   document.head.appendChild(style);
 }
 
+/* ---------- 2c) Favicon Google Ads'te gorunmuyor (2026-09-14) ----------
+   Ikas'in kendi <link rel="shortcut icon"> etiketi SADECE webp veriyor
+   (image_180.webp). Google Ads'in reklam favicon tarayicisi webp'i
+   guvenilir taniMIyor -> reklamda bizim "Ç" ikonumuz yerine jenerik bir
+   kure ikonu cikiyor (canlida ekran goruntusuyle dogrulandi). CDN'de bu
+   favicon'un TEK calisan alternatif uzantisi image_180.jpg (png/ico
+   404 veriyor, denendi). Cozum: webp'in yanina JPG'li ikinci bir
+   <link rel="icon"> ekliyoruz - favicon.ico'ya DOKUNMUYORUZ (Ikas
+   platformunun kendi altyapisi, bizim erisimimiz yok), sadece <head>'e
+   ekstra bir link ekliyoruz. */
+function ccFaviconDuzelt(){
+  if(document.getElementById('cc-favicon-jpg'))return;
+  var link=document.createElement('link');
+  link.id='cc-favicon-jpg';
+  link.rel='icon';
+  link.type='image/jpeg';
+  link.sizes='180x180';
+  link.href='https://cdn.myikas.com/images/theme-images/89119007-8af1-4e5e-b742-c1b886e5ca32/image_180.jpg';
+  document.head.appendChild(link);
+}
+
 /* ---------- ORTAK: tam genislikli bloklarin baglanacagi yer ----------
    KRITIK: Urun gorselleri (.product-detail-page-slider-main) ile satin alma
    kutusu (.product-detail-page-detail-box) AYNI CSS grid'inin cocuklaridir.
@@ -613,7 +634,7 @@ function isInsideOurs(node){
 }
 function renderAll(){
   ccShippingBar();ccBrandStrip();ccStoreInfo();ccCheckoutTrust();ccCategoryCount();ccProductDelivery();
-  ccBedenTablosu();ccZenginIcerik();ccTrendyolVitrin();ccVaryantKutuDuzelt();
+  ccBedenTablosu();ccZenginIcerik();ccTrendyolVitrin();ccVaryantKutuDuzelt();ccFaviconDuzelt();
 }
 var scheduled=false;
 function schedule(){
