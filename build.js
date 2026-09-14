@@ -195,6 +195,103 @@ function ccFaviconDuzelt(){
   document.head.appendChild(link);
 }
 
+/* ---------- 2d) Mobilde Beden kutusu: tiklayinca acilan kapali kutu (2026-09-14) ----------
+   Semih'in istegi: mobilde Beden secenekleri hep acik satirlar halinde
+   durup yer kapliyordu. Iki mockup gosterildi (A: acilinca sayfayi asagi
+   iten akordiyon, B: secili degeri gosteren, tiklayinca ustune BINEN kutu)
+   - B secildi.
+   Ikas'in kendi React agacina DOKUNMUYORUZ (reparent React DOM'unu
+   bozabilir). Sadece:
+   - Beden grubunu Renk'ten ayirt ediyoruz: sadece Beden'in (ve varsa
+     Numara gibi diger ikincil varyantlarin) kutucuklari '.variant-types'
+     class'ini tasiyor, Renk'inkiler tasimiyor (bkz. yukaridaki
+     ccVaryantKutuDuzelt notu, canlida olculdu).
+   - O gruba "kapali kutu" sahte bir div ekliyoruz (secili degeri yazar).
+   - Acik/kapali durumu sarici elemanda data-cc-beden-acik ile tutuluyor,
+     gercek secenek grid'i acikken position:absolute ile ustune BINiyor
+     (sayfa boyu degismiyor).
+   - CSS media-query ':has()' ile mobilde grid varsayilan KAPALI baslar
+     (JS calismadan once bir anlik acik gorunme/FOUC olmasin diye);
+     JS sadece acilinca inline style ile bu kurali gecersiz kiliyor.
+   Her renderAll() dongusunde tekrar calisir (React DOM'u degistirebilir),
+   bu yuzden her adim idempotent yazildi. */
+function ccBedenKutusu(){
+  if(!document.getElementById('cc-beden-kutu-stil')){
+    var s=document.createElement('style');s.id='cc-beden-kutu-stil';
+    s.textContent='@media(max-width:767px){.product-detail-page-variants:has(.variant-types){display:none;}}';
+    document.head.appendChild(s);
+  }
+  var mobil=window.innerWidth<=767;
+  var gruplar=document.querySelectorAll('.product-detail-page-variants');
+  for(var i=0;i<gruplar.length;i++){
+    var grid=gruplar[i];
+    var ilkCocuk=grid.firstElementChild;
+    var bedenMi=ilkCocuk&&ilkCocuk.className.indexOf('variant-types')!==-1;
+    if(!bedenMi)continue;
+    var sarici=grid.parentElement;
+    var kutu=sarici.querySelector('.cc-beden-kutu');
+    if(!mobil){
+      if(kutu)kutu.remove();
+      grid.style.position='';grid.style.top='';grid.style.left='';grid.style.right='';
+      grid.style.zIndex='';grid.style.background='';grid.style.border='';grid.style.borderRadius='';
+      grid.style.boxShadow='';grid.style.padding='';grid.style.display='';
+      sarici.style.position='';
+      delete sarici.dataset.ccBedenAcik;
+      continue;
+    }
+    if(sarici.style.position!=='relative')sarici.style.position='relative';
+    var acik=sarici.dataset.ccBedenAcik==='1';
+    if(!kutu){
+      kutu=document.createElement('div');kutu.className='cc-beden-kutu';
+      kutu.style.cssText='display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border:1px solid #D1D5DB;border-radius:8px;background:#fff;font-size:14px;color:#1C274B;cursor:pointer;margin-bottom:4px;';
+      kutu.innerHTML='<span class="cc-beden-kutu-metin"></span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1C274B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="transition:transform .15s;flex-shrink:0;"><polyline points="6 9 12 15 18 9"></polyline></svg>';
+      kutu.addEventListener('click',function(e){
+        e.stopPropagation();
+        var s=this.parentElement;
+        s.dataset.ccBedenAcik=(s.dataset.ccBedenAcik==='1')?'0':'1';
+        ccBedenKutusu();
+      });
+      grid.parentElement.insertBefore(kutu,grid);
+    }
+    var secili=grid.querySelector('.selected-circle .variant-name');
+    var metinEl=kutu.querySelector('.cc-beden-kutu-metin');
+    var yeniMetin=secili?secili.textContent:'Seçiniz';
+    if(metinEl.textContent!==yeniMetin)metinEl.textContent=yeniMetin;
+    var ok=kutu.querySelector('svg');
+    ok.style.transform=acik?'rotate(180deg)':'rotate(0deg)';
+    if(acik){
+      grid.style.display='flex';
+      grid.style.position='absolute';grid.style.top='100%';grid.style.left='0';grid.style.right='0';
+      grid.style.zIndex='50';grid.style.background='#fff';grid.style.border='1px solid #D1D5DB';
+      grid.style.borderRadius='8px';grid.style.boxShadow='0 8px 24px rgba(0,0,0,.15)';
+      grid.style.padding='10px';
+    }else{
+      grid.style.display='';grid.style.position='';grid.style.boxShadow='';grid.style.border='';
+      grid.style.borderRadius='';grid.style.padding='';grid.style.background='';grid.style.zIndex='';
+    }
+    if(!grid.dataset.ccKapatBagli){
+      grid.dataset.ccKapatBagli='1';
+      grid.addEventListener('click',function(ev){
+        var hedef=ev.target.closest('.variant-types');
+        if(hedef){
+          var s=this.parentElement;
+          setTimeout(function(){s.dataset.ccBedenAcik='0';ccBedenKutusu();},80);
+        }
+      });
+    }
+  }
+  if(!window.__ccBedenDisTiklamaBagli){
+    window.__ccBedenDisTiklamaBagli=true;
+    document.addEventListener('click',function(ev){
+      var acikSaricilar=document.querySelectorAll('[data-cc-beden-acik="1"]');
+      for(var j=0;j<acikSaricilar.length;j++){
+        var s=acikSaricilar[j];
+        if(!s.contains(ev.target)){s.dataset.ccBedenAcik='0';ccBedenKutusu();}
+      }
+    });
+  }
+}
+
 /* ---------- ORTAK: tam genislikli bloklarin baglanacagi yer ----------
    KRITIK: Urun gorselleri (.product-detail-page-slider-main) ile satin alma
    kutusu (.product-detail-page-detail-box) AYNI CSS grid'inin cocuklaridir.
@@ -634,7 +731,7 @@ function isInsideOurs(node){
 }
 function renderAll(){
   ccShippingBar();ccBrandStrip();ccStoreInfo();ccCheckoutTrust();ccCategoryCount();ccProductDelivery();
-  ccBedenTablosu();ccZenginIcerik();ccTrendyolVitrin();ccVaryantKutuDuzelt();ccFaviconDuzelt();
+  ccBedenTablosu();ccZenginIcerik();ccTrendyolVitrin();ccVaryantKutuDuzelt();ccFaviconDuzelt();ccBedenKutusu();
 }
 var scheduled=false;
 function schedule(){
@@ -649,6 +746,7 @@ var observer=new MutationObserver(function(mutations){
 observer.observe(document.documentElement,{childList:true,subtree:true,characterData:true,attributes:true,attributeFilter:['src']});
 setInterval(renderAll, 2000);
 window.addEventListener('resize', ccBedenTablosu);
+window.addEventListener('resize', ccBedenKutusu);
 /* Zengin icerik ekrana yaklasinca hemen yuklensin (2sn dongusunu beklemesin).
    schedule() 150ms debounce'li - kaydirma sirasinda tek is calisir. */
 window.addEventListener('scroll', schedule, {passive:true});
