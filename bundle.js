@@ -80,14 +80,31 @@ function ccCheckoutTrust(){
   document.body.insertBefore(box,footerEl);
 }
 
+/* __NEXT_DATA__ 1-4 MB: eskiden ccCategoryCount/ccProductDelivery/cc_yerelNextData
+   her renderAll turunda (kaydirirken ~6 kez/sn) BASTAN JSON.parse ediyordu
+   (2026-09-21 performans incelemesi). Etiket ayni kaldikca sonuc onbellekte. */
+var cc_nd={el:null,dugum:null,len:-1,d:null};
+function cc_ndOku(){
+  var el=document.getElementById('__NEXT_DATA__');
+  if(!el)return null;
+  var dugum=el.firstChild;
+  var len=dugum?dugum.length:0;
+  if(cc_nd.el!==el||cc_nd.dugum!==dugum||cc_nd.len!==len){
+    var d=null;
+    try{d=JSON.parse(el.textContent);}catch(e){}
+    cc_nd={el:el,dugum:dugum,len:len,d:d};
+  }
+  return cc_nd.d;
+}
+
 function ccCategoryCount(){
   var existing=document.body.querySelector('#cc-category-count');
   var nextDataEl=document.getElementById('__NEXT_DATA__');
   var count=null;
   if(nextDataEl){
     try{
-      var d=JSON.parse(nextDataEl.textContent);
-      var pp=d.props&&d.props.pageProps;
+      var d=cc_ndOku();
+      var pp=d&&d.props&&d.props.pageProps;
       if(pp&&pp.pageTitle===document.title&&pp.propValues){
         var arr=pp.propValues;
         for(var i=0;i<arr.length;i++){
@@ -112,8 +129,8 @@ function ccProductDelivery(){
   var isProduct=false;
   if(nextDataEl){
     try{
-      var d=JSON.parse(nextDataEl.textContent);
-      var pp=d.props&&d.props.pageProps;
+      var d=cc_ndOku();
+      var pp=d&&d.props&&d.props.pageProps;
       if(pp&&pp.pageTitle===document.title&&pp.pageType==='PRODUCT'){isProduct=true;}
     }catch(e){}
   }
@@ -317,8 +334,8 @@ function cc_yerelNextData(){
   try {
     var el = document.getElementById('__NEXT_DATA__');
     if(!el) return null;
-    var d = JSON.parse(el.textContent);
-    var pp = d.props && d.props.pageProps;
+    var d = cc_ndOku();
+    var pp = d && d.props && d.props.pageProps;
     if(!pp) return null;
     if(pp.pageTitle !== document.title) return null;   /* bayat - guvenme */
     return d;
@@ -486,7 +503,9 @@ function zi_renderSliced(wrap, src){
     try { zi_buildCards(wrap, src, img.naturalWidth, img.naturalHeight, zi_computeSegments(img)); }
     catch(e){ zi_buildFallbackImg(wrap, src); }   /* canvas/CORS engeli - tek parca goster */
   };
-  img.onerror = function(){ wrap.remove(); };
+  /* Hata: blogu SILME - silinirse sonraki tur yeniden olusturup gorseli tekrar
+     ister (hata aninda sonsuz dongu). Gizle ve "yuklendi" say. */
+  img.onerror = function(){ wrap.style.display = 'none'; wrap.setAttribute('data-yuklendi', '1'); };
   img.src = src;
 }
 /* Gorsel ~230KB - sayfa acilirken indirmeye gerek yok, blok ekrana yaklasinca
@@ -536,7 +555,8 @@ function zi_applyImage(imgId){
   }
 }
 function zi_applyFromNextDataObject(dataObj){
-  var psd = zi_findPageSpecificData(dataObj, 0);
+  var pp0 = dataObj && dataObj.props && dataObj.props.pageProps;
+  var psd = (pp0 && pp0.pageSpecificData && pp0.pageSpecificData.attributes) ? pp0.pageSpecificData : zi_findPageSpecificData(dataObj, 0);
   var imgId = psd ? zi_imageIdFromAttributes(psd.attributes) : null;
   zi_applyImage(imgId);
 }
@@ -735,7 +755,10 @@ window.addEventListener('resize', ccBedenTablosu);
 window.addEventListener('resize', ccBedenKutusu);
 /* Zengin icerik ekrana yaklasinca hemen yuklensin (2sn dongusunu beklemesin).
    schedule() 150ms debounce'li - kaydirma sirasinda tek is calisir. */
-window.addEventListener('scroll', schedule, {passive:true});
+window.addEventListener('scroll', function(){
+  var z=document.getElementById('zengin-icerik-blok');
+  if(z&&z.getAttribute('data-yuklendi')!=='1')schedule();
+}, {passive:true});
 schedule();
 document.addEventListener('DOMContentLoaded',schedule);
 })();
