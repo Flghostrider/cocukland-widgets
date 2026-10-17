@@ -737,13 +737,27 @@ function ccTrendyolVitrin(){
   }
 }
 
+/* Native offer totals do not include cart campaigns. Keep amounts intact and
+   label their scope explicitly for the park-bed bundles. */
+function ccBundleTotalLabel(){
+  var box=document.querySelector('.product-detail-page-detail-box');
+  if(!box || box.textContent.indexOf('park yatağına sepette indirim uygulanır')===-1)return;
+  var price=box.querySelector('.product-offer-final-price');
+  if(!price || !price.parentElement || !price.parentElement.parentElement)return;
+  var total=price.parentElement.parentElement.parentElement;
+  var label=total && total.firstElementChild;
+  if(label && (label.textContent==='Avantajlı Toplam' || label.textContent==='Toplam')){
+    label.textContent='Sepet indirimi öncesi toplam';
+  }
+}
+
 /* ---------- Paylasilan tek gozlemci + tek dongu ---------- */
 function isInsideOurs(node){
   var el=node&&node.nodeType===1?node:(node&&node.parentElement);
   return !!(el&&el.closest&&(el.closest('#cc-shipping-bar')||el.closest('#cc-brand-strip')||el.closest('#cc-footer-stores')||el.closest('#cc-store-list')||el.closest('#cc-checkout-trust')||el.closest('#cc-category-count')||el.closest('#cc-product-delivery')||el.closest('#'+TY_VITRIN_ID)||el.closest('#'+TY_OZET_ID)||el.closest('#zengin-icerik-blok')));
 }
 function renderAll(){
-  ccShippingBar();ccBrandStrip();ccStoreInfo();ccCheckoutTrust();ccCategoryCount();ccProductDelivery();
+  ccShippingBar();ccBrandStrip();ccStoreInfo();ccCheckoutTrust();ccCategoryCount();ccProductDelivery();ccBundleTotalLabel();
   ccBedenTablosu();ccZenginIcerik();ccTrendyolVitrin();ccVaryantKutuDuzelt();ccFaviconDuzelt();ccBedenKutusu();
 }
 var scheduled=false;
