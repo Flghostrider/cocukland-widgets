@@ -235,7 +235,7 @@ function ccFaviconDuzelt(){
 function ccBedenKutusu(){
   if(!document.getElementById('cc-beden-kutu-stil')){
     var s=document.createElement('style');s.id='cc-beden-kutu-stil';
-    s.textContent='@media(max-width:767px){.product-detail-page-variants:has(.variant-types){display:none;}}';
+    s.textContent='@media(max-width:767px){.product-detail-page-variants:has(.variant-types){display:none;}.product-detail-page-variants .first-image-circle{width:64px!important;height:96px!important;}}.cc-beden-kutu:focus-visible{outline:3px solid #1C274B;outline-offset:3px;}@media(prefers-reduced-motion:reduce){.ty-vitrin-track{animation:none!important;}}';
     document.head.appendChild(s);
   }
   var mobil=window.innerWidth<=767;
@@ -260,6 +260,11 @@ function ccBedenKutusu(){
     var acik=sarici.dataset.ccBedenAcik==='1';
     if(!kutu){
       kutu=document.createElement('div');kutu.className='cc-beden-kutu';
+      kutu.setAttribute('role','button');kutu.tabIndex=0;
+      kutu.addEventListener('keydown',function(e){
+        if(e.key==='Enter'||e.key===' '){e.preventDefault();this.click();}
+        else if(e.key==='Escape'){this.parentElement.dataset.ccBedenAcik='0';ccBedenKutusu();}
+      });
       kutu.style.cssText='display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border:1px solid #D1D5DB;border-radius:8px;background:#fff;font-size:14px;color:#1C274B;cursor:pointer;margin-bottom:4px;';
       kutu.innerHTML='<span class="cc-beden-kutu-metin"></span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1C274B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="transition:transform .15s;flex-shrink:0;"><polyline points="6 9 12 15 18 9"></polyline></svg>';
       kutu.addEventListener('click',function(e){
@@ -274,6 +279,8 @@ function ccBedenKutusu(){
     var metinEl=kutu.querySelector('.cc-beden-kutu-metin');
     var yeniMetin=secili?secili.textContent:'Seçiniz';
     if(metinEl.textContent!==yeniMetin)metinEl.textContent=yeniMetin;
+    kutu.setAttribute('aria-expanded',acik?'true':'false');
+    kutu.setAttribute('aria-label','Beden seçimi: '+yeniMetin);
     var ok=kutu.querySelector('svg');
     ok.style.transform=acik?'rotate(180deg)':'rotate(0deg)';
     if(acik){
@@ -693,7 +700,7 @@ function ty_vitrinOlustur(icerik){
   var hizSn = Math.max(18, yorumlar.length * 5);
   track.style.cssText = "display:flex;width:max-content;padding:4px 0;animation:ty-vitrin-scroll " + hizSn + "s linear infinite;";
   yorumlar.forEach(function(y){ track.appendChild(ty_miniKart(y)); });
-  yorumlar.forEach(function(y){ track.appendChild(ty_miniKart(y)); }); // ikinci kopya - kesintisiz donus
+  yorumlar.forEach(function(y){ var kopya=ty_miniKart(y);kopya.setAttribute('aria-hidden','true');track.appendChild(kopya); }); // ekranda kesintisiz donus, ekran okuyucuda tek yorum
   kayan.appendChild(track);
   wrap.appendChild(kayan);
   if(!document.getElementById("ty-vitrin-style")){
