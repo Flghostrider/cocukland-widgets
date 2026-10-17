@@ -756,13 +756,14 @@ function ccTrendyolVitrin(){
 function ccBundleTotalLabel(){
   var box=document.querySelector('.product-detail-page-detail-box');
   if(!box || box.textContent.indexOf('park yatağına sepette indirim uygulanır')===-1)return;
-  var price=box.querySelector('.product-offer-final-price');
-  if(!price || !price.parentElement || !price.parentElement.parentElement)return;
-  var total=price.parentElement.parentElement.parentElement;
-  var label=total && total.firstElementChild;
-  if(label && (label.textContent==='Avantajlı Toplam' || label.textContent==='Toplam')){
-    label.textContent='Sepet indirimi öncesi toplam';
-  }
+  box.querySelectorAll('.product-offer-final-price').forEach(function(price){
+    if(!price.parentElement || !price.parentElement.parentElement)return;
+    var total=price.parentElement.parentElement.parentElement;
+    var label=total && total.firstElementChild;
+    if(label && (label.textContent==='Avantajlı Toplam' || label.textContent==='Toplam')){
+      label.textContent='Sepet indirimi öncesi toplam';
+    }
+  });
 }
 
 /* ---------- Paylasilan tek gozlemci + tek dongu ---------- */
